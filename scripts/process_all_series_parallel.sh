@@ -25,7 +25,7 @@ PARALLEL_JOBS=7
 # Match URLs are loaded from matches.txt in the same directory
 # Format: One URL per line, lines starting with # are ignored
 #
-MATCHES_FILE="$(dirname "${BASH_SOURCE[0]}")/matches_part1.txt"
+MATCHES_FILE="$(dirname "${BASH_SOURCE[0]}")/matches_part2.txt"
 
 #==============================================================================
 # SCRIPT SETUP

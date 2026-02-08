@@ -16,6 +16,8 @@ dependencies = [
     "beautifulsoup4>=4.12.0",  # HTML parsing for VLR scraper
     "requests>=2.31.0",  # HTTP requests for VLR scraper
     "playwright>=1.40.0",  # Browser automation for VLR scraper
+    "matplotlib>=3.10.8",
+    "seaborn>=0.13.2",
 ]
 
 [project.optional-dependencies]

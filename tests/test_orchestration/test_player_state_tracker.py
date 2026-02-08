@@ -137,8 +137,8 @@ class TestPlayerStateTracker:
         tracker.update(detections, timestamp=10.0)
         assert tracker.revival_candidate_count == 1
 
-        # Detection fails (no health)
-        tracker.update({}, timestamp=11.0)
+        # Detection fails (health key present but None value)
+        tracker.update({"health": None}, timestamp=11.0)
         assert tracker.revival_candidate_count == 0
         assert tracker.revival_first_detection_timestamp is None
 

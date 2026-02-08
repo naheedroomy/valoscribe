@@ -476,6 +476,20 @@ class GameStateManager:
                         f"Synced state at round start"
                     )
 
+            # Check for phantom round: compute expected round from scores
+            expected_round = (
+                self.round_manager.current_score["team1"]
+                + self.round_manager.current_score["team2"]
+                + 1
+            )
+            if self.round_manager.correct_round_number(expected_round, timestamp):
+                discarded = self.event_collector.discard_round_buffer()
+                log.warning(f"Discarded {len(discarded)} events from phantom round")
+                self.event_collector.killfeed_dedup.reset()
+
+            # Flush previous round's buffered events before starting new round
+            self.event_collector.flush_round_buffer()
+
             event = self._add_timers_to_event({
                 "type": "round_start",
                 "timestamp": timestamp,
@@ -527,6 +541,21 @@ class GameStateManager:
                     tracker.current_state["alive"] = True
                     tracker.previous_state["alive"] = True
                     log.debug(f"Player {tracker.player_index}: Grace period started, forced alive @ {timestamp:.2f}s")
+
+            # Check for phantom round: compute expected round from scores
+            expected_round = (
+                self.round_manager.current_score["team1"]
+                + self.round_manager.current_score["team2"]
+                + 1
+            )
+            if self.round_manager.correct_round_number(expected_round, timestamp):
+                discarded = self.event_collector.discard_round_buffer()
+                log.warning(f"Discarded {len(discarded)} events from phantom round")
+                self.event_collector.killfeed_dedup.reset()
+                round_number = self.round_manager.current_round
+
+            # Flush previous round's buffered events before starting new round
+            self.event_collector.flush_round_buffer()
 
             # Round start event
             event = self._add_timers_to_event({
@@ -974,9 +1003,11 @@ class GameStateManager:
 
             enriched_kills.append((kill_detection, player_info))
 
-        num_kills = self.event_collector.add_killfeed_events(timestamp, enriched_kills)
+        # Backdate kill timestamps by 2 frames to account for killfeed display delay
+        kill_timestamp = timestamp - 2 / self.fps
+        num_kills = self.event_collector.add_killfeed_events(kill_timestamp, enriched_kills)
         if num_kills > 0:
-            log.debug(f"Accepted {num_kills} valid kills after deduplication @ {timestamp:.2f}s")
+            log.debug(f"Accepted {num_kills} valid kills after deduplication @ {kill_timestamp:.2f}s (backdated from {timestamp:.2f}s)")
 
         # Debug: Print summary of all player states every 25 frames (every ~6 seconds at 4fps)
         if self.frame_count % 25 == 0:
@@ -1252,9 +1283,11 @@ class GameStateManager:
 
             enriched_kills.append((kill_detection, player_info))
 
-        num_kills = self.event_collector.add_killfeed_events(timestamp, enriched_kills)
+        # Backdate kill timestamps by 2 frames to account for killfeed display delay
+        kill_timestamp = timestamp - 2 / self.fps
+        num_kills = self.event_collector.add_killfeed_events(kill_timestamp, enriched_kills)
         if num_kills > 0:
-            log.debug(f"Accepted {num_kills} valid kills after deduplication @ {timestamp:.2f}s")
+            log.debug(f"Accepted {num_kills} valid kills after deduplication @ {kill_timestamp:.2f}s (backdated from {timestamp:.2f}s)")
 
         # Debug: Print summary of all player states every 25 frames (every ~6 seconds at 4fps)
         if self.frame_count % 25 == 0:
@@ -1729,9 +1762,6 @@ class GameStateManager:
                 f"Score: {score_team1}-{score_team2} (incremented from previous)"
             )
 
-            # Write the round_end event immediately
-            self.output_writer.write_events([round_end_event])
-
         # Check if we need to fire match_end event
         if not self.match_ended:
             # Check if the match should have ended (score >= 13 with 2 round lead)
@@ -1768,8 +1798,11 @@ class GameStateManager:
                     f"{match_winner} wins ({score_team1}-{score_team2})"
                 )
 
-                # Write the match_end event immediately
-                self.output_writer.write_events([match_end_event])
+        # Flush the last round's buffer and write all remaining events to disk
+        self.event_collector.flush_round_buffer()
+        remaining_events = self.event_collector.get_events_since_last_write()
+        if remaining_events:
+            self.output_writer.write_events(remaining_events)
 
     def _print_progress(self, timestamp: float) -> None:
         """Print progress information."""

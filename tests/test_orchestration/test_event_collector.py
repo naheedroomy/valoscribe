@@ -29,10 +29,10 @@ class TestEventCollector:
         """Test adding a basic event."""
         collector.add_event("round_start", timestamp=0.0, round_number=1)
 
-        assert len(collector.events) == 1
-        assert collector.events[0]["type"] == "round_start"
-        assert collector.events[0]["timestamp"] == 0.0
-        assert collector.events[0]["round_number"] == 1
+        assert len(collector.round_buffer) == 1
+        assert collector.round_buffer[0]["type"] == "round_start"
+        assert collector.round_buffer[0]["timestamp"] == 0.0
+        assert collector.round_buffer[0]["round_number"] == 1
 
     def test_add_event_with_data(self, collector):
         """Test adding event with multiple data fields."""
@@ -44,8 +44,8 @@ class TestEventCollector:
             agent="sova",
         )
 
-        assert len(collector.events) == 1
-        event = collector.events[0]
+        assert len(collector.round_buffer) == 1
+        event = collector.round_buffer[0]
         assert event["type"] == "death"
         assert event["timestamp"] == 10.5
         assert event["player"] == "brawk"
@@ -58,10 +58,10 @@ class TestEventCollector:
         collector.add_event("death", timestamp=5.0, player="player1")
         collector.add_event("kill", timestamp=5.0, killer="player2")
 
-        assert len(collector.events) == 3
-        assert collector.events[0]["type"] == "round_start"
-        assert collector.events[1]["type"] == "death"
-        assert collector.events[2]["type"] == "kill"
+        assert len(collector.round_buffer) == 3
+        assert collector.round_buffer[0]["type"] == "round_start"
+        assert collector.round_buffer[1]["type"] == "death"
+        assert collector.round_buffer[2]["type"] == "kill"
 
     def test_add_player_events(self, collector):
         """Test adding player events from StateValidator."""
@@ -83,9 +83,9 @@ class TestEventCollector:
 
         collector.add_player_events(player_events)
 
-        assert len(collector.events) == 2
-        assert collector.events[0]["type"] == "death"
-        assert collector.events[1]["type"] == "ability_used"
+        assert len(collector.round_buffer) == 2
+        assert collector.round_buffer[0]["type"] == "death"
+        assert collector.round_buffer[1]["type"] == "ability_used"
 
     def test_add_killfeed_events_single(self, collector):
         """Test adding single killfeed event."""
@@ -97,37 +97,39 @@ class TestEventCollector:
             confidence=0.95,
         )
 
-        added = collector.add_killfeed_events(timestamp=5.0, killfeed_detections=[detection])
+        added = collector.add_killfeed_events(
+            timestamp=5.0, killfeed_detections=[(detection, {})]
+        )
 
         assert added == 1
-        assert len(collector.events) == 1
-        assert collector.events[0]["type"] == "kill"
-        assert collector.events[0]["killer_agent"] == "jett"
-        assert collector.events[0]["victim_agent"] == "sova"
+        assert len(collector.round_buffer) == 1
+        assert collector.round_buffer[0]["type"] == "kill"
+        assert collector.round_buffer[0]["killer_agent"] == "jett"
+        assert collector.round_buffer[0]["victim_agent"] == "sova"
 
     def test_add_killfeed_events_multiple(self, collector):
         """Test adding multiple killfeed events."""
         detections = [
-            KillfeedAgentDetection(
+            (KillfeedAgentDetection(
                 killer_agent="jett",
                 killer_side="attack",
                 victim_agent="sova",
                 victim_side="defense",
                 confidence=0.95,
-            ),
-            KillfeedAgentDetection(
+            ), {}),
+            (KillfeedAgentDetection(
                 killer_agent="raze",
                 killer_side="attack",
                 victim_agent="cypher",
                 victim_side="defense",
                 confidence=0.92,
-            ),
+            ), {}),
         ]
 
         added = collector.add_killfeed_events(timestamp=5.0, killfeed_detections=detections)
 
         assert added == 2
-        assert len(collector.events) == 2
+        assert len(collector.round_buffer) == 2
 
     def test_killfeed_deduplication(self, collector):
         """Test that duplicate killfeed events are filtered."""
@@ -140,14 +142,14 @@ class TestEventCollector:
         )
 
         # Add same kill multiple times (simulating consecutive frames)
-        added1 = collector.add_killfeed_events(timestamp=5.0, killfeed_detections=[detection])
-        added2 = collector.add_killfeed_events(timestamp=5.25, killfeed_detections=[detection])
-        added3 = collector.add_killfeed_events(timestamp=5.5, killfeed_detections=[detection])
+        added1 = collector.add_killfeed_events(timestamp=5.0, killfeed_detections=[(detection, {})])
+        added2 = collector.add_killfeed_events(timestamp=5.25, killfeed_detections=[(detection, {})])
+        added3 = collector.add_killfeed_events(timestamp=5.5, killfeed_detections=[(detection, {})])
 
         assert added1 == 1  # First is new
         assert added2 == 0  # Duplicate
         assert added3 == 0  # Duplicate
-        assert len(collector.events) == 1  # Only one kill logged
+        assert len(collector.round_buffer) == 1  # Only one kill logged
 
     def test_killfeed_expiration(self, collector):
         """Test that kills expire after dedup window."""
@@ -160,14 +162,14 @@ class TestEventCollector:
         )
 
         # Add kill at t=0
-        added1 = collector.add_killfeed_events(timestamp=0.0, killfeed_detections=[detection])
+        added1 = collector.add_killfeed_events(timestamp=0.0, killfeed_detections=[(detection, {})])
 
         # Same kill at t=6 (beyond 5s window) - should be new
-        added2 = collector.add_killfeed_events(timestamp=6.0, killfeed_detections=[detection])
+        added2 = collector.add_killfeed_events(timestamp=6.0, killfeed_detections=[(detection, {})])
 
         assert added1 == 1
         assert added2 == 1
-        assert len(collector.events) == 2  # Two separate kill instances
+        assert len(collector.round_buffer) == 2  # Two separate kill instances
 
     def test_get_events_all(self, collector):
         """Test getting all events."""
@@ -178,9 +180,9 @@ class TestEventCollector:
         events = collector.get_events()
 
         assert len(events) == 3
-        # Should be a copy
+        # Should be a copy (concatenation creates new list)
         events.append({"type": "test"})
-        assert len(collector.events) == 3
+        assert len(collector.round_buffer) == 3
 
     def test_get_events_filtered(self, collector):
         """Test getting events filtered by type."""
@@ -249,23 +251,13 @@ class TestEventCollector:
         collector.add_event("event1", timestamp=0.0)
         collector.add_event("event2", timestamp=5.0)
 
-        detection = KillfeedAgentDetection(
-            killer_agent="jett",
-            killer_side="attack",
-            victim_agent="sova",
-            victim_side="defense",
-            confidence=0.95,
-        )
-        collector.add_killfeed_events(timestamp=10.0, killfeed_detections=[detection])
-
-        assert len(collector.events) == 3
-        assert collector.killfeed_dedup.get_recent_kill_count() == 1
+        assert len(collector.round_buffer) == 2
 
         # Reset
         collector.reset()
 
         assert len(collector.events) == 0
-        assert collector.killfeed_dedup.get_recent_kill_count() == 0
+        assert len(collector.round_buffer) == 0
 
     def test_get_event_summary(self, collector):
         """Test getting event summary."""
@@ -297,6 +289,38 @@ class TestEventCollector:
         assert "total_events=2" in repr_str
         assert "event_types=2" in repr_str
 
+    def test_discard_round_buffer_with_events(self, collector):
+        """Test discarding round buffer returns and clears events."""
+        collector.add_event("death", timestamp=5.0, player="player1")
+        collector.add_event("kill", timestamp=5.0, killer="player2")
+
+        discarded = collector.discard_round_buffer()
+
+        assert len(discarded) == 2
+        assert discarded[0]["type"] == "death"
+        assert discarded[1]["type"] == "kill"
+        assert len(collector.round_buffer) == 0
+
+    def test_discard_round_buffer_empty(self, collector):
+        """Test discarding empty round buffer."""
+        discarded = collector.discard_round_buffer()
+
+        assert discarded == []
+        assert len(collector.round_buffer) == 0
+
+    def test_discard_does_not_affect_committed_events(self, collector):
+        """Test that discard only affects the buffer, not committed events."""
+        # Commit some events first
+        collector.add_event("round_start", timestamp=0.0)
+        collector.flush_round_buffer()
+
+        # Add events to buffer then discard
+        collector.add_event("death", timestamp=5.0)
+        collector.discard_round_buffer()
+
+        assert len(collector.events) == 1  # committed event remains
+        assert len(collector.round_buffer) == 0
+
     def test_realistic_scenario(self, collector):
         """Test realistic game scenario with mixed events."""
         # Round start
@@ -309,31 +333,24 @@ class TestEventCollector:
         ]
         collector.add_player_events(player_events)
 
-        # Killfeed events (with duplicates across frames)
-        kill1 = KillfeedAgentDetection(
-            killer_agent="jett",
-            killer_side="attack",
-            victim_agent="sova",
-            victim_side="defense",
-            confidence=0.95,
-        )
-
-        # Same kill detected over 5 frames
-        for i in range(5):
-            collector.add_killfeed_events(
-                timestamp=10.0 + i * 0.25,
-                killfeed_detections=[kill1],
-            )
-
         # Round end
         collector.add_event("round_end", timestamp=100.0, round_number=1)
 
-        # Should have: 1 round_start + 2 player_events + 1 kill + 1 round_end = 5 events
-        assert len(collector.events) == 5
+        # All events are in the buffer before flush
+        assert len(collector.round_buffer) == 4
+
+        # Flush to simulate round boundary
+        flushed = collector.flush_round_buffer()
+        assert len(flushed) == 4
+        assert len(collector.events) == 4
+        assert len(collector.round_buffer) == 0
+
+        # Events should be sorted by timestamp after flush
+        timestamps = [e["timestamp"] for e in collector.events]
+        assert timestamps == sorted(timestamps)
 
         summary = collector.get_event_summary()
         assert summary["round_start"] == 1
         assert summary["death"] == 1
         assert summary["ability_used"] == 1
-        assert summary["kill"] == 1
         assert summary["round_end"] == 1

@@ -35,6 +35,7 @@ class EventCollector:
             dedup_window_sec: Time window for killfeed deduplication (default: 5.0s)
         """
         self.events: list[dict] = []
+        self.round_buffer: list[dict] = []
         self.killfeed_dedup = KillfeedDeduplicator(dedup_window_sec=dedup_window_sec)
         self._last_write_index = 0  # Track last written event index
 
@@ -55,7 +56,7 @@ class EventCollector:
         """
         if isinstance(event, dict):
             # Dict format
-            self.events.append(event)
+            self.round_buffer.append(event)
             log.debug(f"Event added: {event.get('type', 'unknown')} at {event.get('timestamp', 0):.2f}s")
         else:
             # Separate params format
@@ -66,7 +67,7 @@ class EventCollector:
                 "timestamp": timestamp,
                 **data,
             }
-            self.events.append(event_dict)
+            self.round_buffer.append(event_dict)
             log.debug(f"Event added: {event} at {timestamp:.2f}s")
 
     def add_player_events(self, player_events: list[dict]) -> None:
@@ -78,7 +79,7 @@ class EventCollector:
         """
         for event in player_events:
             # Events from StateValidator already have type, timestamp, and data
-            self.events.append(event)
+            self.round_buffer.append(event)
             log.debug(f"Player event added: {event['type']} at {event['timestamp']:.2f}s")
 
     def add_killfeed_events(
@@ -140,9 +141,39 @@ class EventCollector:
 
         return added_count
 
+    def flush_round_buffer(self) -> list[dict]:
+        """
+        Flush the round buffer: sort buffered events by timestamp,
+        move them into self.events, clear the buffer, and return
+        the flushed events.
+
+        Returns:
+            List of events that were flushed from the buffer
+        """
+        if not self.round_buffer:
+            return []
+
+        # Sort buffer by timestamp before committing
+        self.round_buffer.sort(key=lambda e: e["timestamp"])
+
+        flushed = list(self.round_buffer)
+        self.events.extend(flushed)
+        self.round_buffer.clear()
+
+        log.debug(f"Flushed {len(flushed)} events from round buffer")
+        return flushed
+
+    def discard_round_buffer(self) -> list[dict]:
+        """Discard all events in the round buffer without committing them."""
+        discarded = list(self.round_buffer)
+        self.round_buffer.clear()
+        if discarded:
+            log.info(f"Discarded {len(discarded)} events from round buffer")
+        return discarded
+
     def get_events(self, event_type: Optional[str] = None) -> list[dict]:
         """
-        Get all events, optionally filtered by type.
+        Get all events (committed + buffered), optionally filtered by type.
 
         Args:
             event_type: Optional event type to filter by
@@ -150,19 +181,20 @@ class EventCollector:
         Returns:
             List of event dictionaries
         """
+        all_events = self.events + self.round_buffer
         if event_type is None:
-            return self.events.copy()
+            return all_events
 
-        return [e for e in self.events if e["type"] == event_type]
+        return [e for e in all_events if e["type"] == event_type]
 
     def get_all_events(self) -> list[dict]:
         """
-        Get all events (alias for get_events()).
+        Get all events (committed + buffered).
 
         Returns:
             List of all event dictionaries
         """
-        return self.events.copy()
+        return self.events + self.round_buffer
 
     def get_events_since_last_write(self) -> list[dict]:
         """
@@ -192,10 +224,12 @@ class EventCollector:
         Returns:
             List of event dictionaries in the time range
         """
-        events = self.events if event_type is None else self.get_events(event_type)
+        all_events = self.events + self.round_buffer
+        if event_type is not None:
+            all_events = [e for e in all_events if e["type"] == event_type]
 
         return [
-            e for e in events
+            e for e in all_events
             if start_time <= e["timestamp"] <= end_time
         ]
 
@@ -210,13 +244,14 @@ class EventCollector:
             Number of events
         """
         if event_type is None:
-            return len(self.events)
+            return len(self.events) + len(self.round_buffer)
 
         return len(self.get_events(event_type))
 
     def reset(self) -> None:
         """Reset the event collector, clearing all events and dedup cache."""
         self.events.clear()
+        self.round_buffer.clear()
         self.killfeed_dedup.reset()
         log.debug("EventCollector reset")
 
@@ -229,7 +264,7 @@ class EventCollector:
         """
         summary: dict[str, int] = {}
 
-        for event in self.events:
+        for event in self.events + self.round_buffer:
             event_type = event["type"]
             summary[event_type] = summary.get(event_type, 0) + 1
 
@@ -237,9 +272,10 @@ class EventCollector:
 
     def __repr__(self) -> str:
         """String representation."""
-        event_types = set(e["type"] for e in self.events)
+        all_events = self.events + self.round_buffer
+        event_types = set(e["type"] for e in all_events)
         return (
             f"EventCollector("
-            f"total_events={len(self.events)}, "
+            f"total_events={len(all_events)}, "
             f"event_types={len(event_types)})"
         )

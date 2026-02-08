@@ -249,6 +249,58 @@ class TestRoundManager:
         with pytest.raises(ValueError, match="Invalid player index"):
             round_manager.get_team_for_player(10)
 
+    def test_correct_round_number_no_correction_needed(self, round_manager):
+        """Test correct_round_number when expected == current (no-op)."""
+        round_manager.start_new_round(timestamp=0.0)  # round 1
+        result = round_manager.correct_round_number(expected_round=1, timestamp=10.0)
+
+        assert result is False
+        assert round_manager.current_round == 1
+        assert len(round_manager.round_history) == 1
+
+    def test_correct_round_number_expected_greater(self, round_manager):
+        """Test correct_round_number when expected > current (no-op)."""
+        round_manager.start_new_round(timestamp=0.0)  # round 1
+        result = round_manager.correct_round_number(expected_round=2, timestamp=10.0)
+
+        assert result is False
+        assert round_manager.current_round == 1
+
+    def test_correct_round_number_single_phantom(self, round_manager):
+        """Test correcting a single phantom round."""
+        round_manager.start_new_round(timestamp=0.0)    # round 1 (real)
+        round_manager.infer_round_end({"team1": 1, "team2": 0}, timestamp=90.0)
+        round_manager.start_new_round(timestamp=100.0)   # round 2 (phantom)
+        round_manager.start_new_round(timestamp=110.0)   # round 3 (wrongly incremented)
+
+        # Score is 1-0, so expected round = 1 + 0 + 1 = 2
+        result = round_manager.correct_round_number(expected_round=2, timestamp=115.0)
+
+        assert result is True
+        assert round_manager.current_round == 2
+        # History: round 1 (real) + round 2 (fresh entry) = 2 entries
+        # Original had 3 entries (rounds 1, 2, 3), removed 2 (phantom + wrongly-created), added 1 fresh
+        assert len(round_manager.round_history) == 2
+        assert round_manager.round_history[-1]["round_number"] == 2
+        assert round_manager.round_history[-1]["start_time"] == 115.0
+
+    def test_correct_round_number_multiple_phantoms(self, round_manager):
+        """Test correcting multiple phantom rounds."""
+        round_manager.start_new_round(timestamp=0.0)    # round 1 (real)
+        round_manager.infer_round_end({"team1": 1, "team2": 0}, timestamp=90.0)
+        round_manager.start_new_round(timestamp=100.0)   # round 2 (phantom)
+        round_manager.start_new_round(timestamp=110.0)   # round 3 (phantom)
+        round_manager.start_new_round(timestamp=120.0)   # round 4 (wrongly incremented)
+
+        # Score is 1-0, so expected round = 2
+        result = round_manager.correct_round_number(expected_round=2, timestamp=125.0)
+
+        assert result is True
+        assert round_manager.current_round == 2
+        # Should have 2 entries: round 1 + fresh round 2
+        assert len(round_manager.round_history) == 2
+        assert round_manager.round_history[-1]["round_number"] == 2
+
     def test_repr(self, round_manager):
         """Test string representation."""
         round_manager.start_new_round(timestamp=0.0)

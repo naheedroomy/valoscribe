@@ -105,6 +105,40 @@ class RoundManager:
         log.info(f"Round {self.current_round} started at {timestamp:.2f}s")
         return self.current_round
 
+    def correct_round_number(self, expected_round: int, timestamp: float) -> bool:
+        """
+        Correct round number if score-based computation shows phantom rounds.
+
+        Removes history entries for phantom rounds and the wrongly-created
+        current entry, then creates a fresh entry for the corrected round.
+
+        Returns True if correction was applied.
+        """
+        if expected_round >= self.current_round:
+            return False
+
+        n_phantom = self.current_round - expected_round
+        entries_to_remove = n_phantom + 1  # phantom rounds + wrongly-created current
+        for _ in range(min(entries_to_remove, len(self.round_history))):
+            self.round_history.pop()
+
+        log.warning(
+            f"Round number corrected: {self.current_round} -> {expected_round} "
+            f"({n_phantom} phantom round(s) detected)"
+        )
+
+        self.current_round = expected_round
+
+        # Add fresh history entry for the corrected round
+        self.round_history.append({
+            "round_number": self.current_round,
+            "start_time": timestamp,
+            "end_time": None,
+            "winner": None,
+        })
+
+        return True
+
     def infer_round_end(
         self, new_score: dict[str, int], timestamp: float
     ) -> Optional[str]:

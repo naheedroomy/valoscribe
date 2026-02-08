@@ -76,7 +76,7 @@ class TestGameStateManager:
 
         assert manager.video_path == dummy_video_path
         assert manager.fps == 4.0
-        assert manager.current_phase == Phase.NON_GAME
+        assert manager.current_phase is None  # Set to first detected game phase
         assert manager.frame_count == 0
 
     def test_components_initialized(self, dummy_video_path, vlr_metadata, temp_dir):
@@ -97,12 +97,26 @@ class TestGameStateManager:
         assert manager.output_writer is not None
 
     def test_player_trackers_initialized(self, dummy_video_path, vlr_metadata, temp_dir):
-        """Test that player trackers are initialized from VLR metadata."""
+        """Test that player trackers are lazy-initialized (None at construction)."""
         manager = GameStateManager(
             video_path=dummy_video_path,
             vlr_metadata=vlr_metadata,
             output_dir=temp_dir / "output",
         )
+
+        # Player trackers are lazy-initialized on first preround agent detection
+        assert manager.player_trackers is None
+
+        # Simulate initialization with detected agents and sides
+        detected_agents = [
+            "sova", "jett", "raze", "omen", "killjoy",
+            "sova", "jett", "raze", "omen", "killjoy",
+        ]
+        detected_sides = [
+            "defense", "defense", "defense", "defense", "defense",
+            "attack", "attack", "attack", "attack", "attack",
+        ]
+        manager._initialize_player_trackers_from_agents(detected_agents, detected_sides)
 
         assert len(manager.player_trackers) == 10
 
@@ -202,14 +216,103 @@ class TestGameStateManager:
 
         manager._handle_phase_transition(Phase.POST_ROUND, Phase.ACTIVE_ROUND, 110.0)
 
-        # Should add round_start event
+        # Should add round_start and match_start events (round 1 triggers both)
         events = manager.event_collector.get_all_events()
-        assert len(events) == 1
+        assert len(events) == 2
         assert events[0]["type"] == "round_start"
+        assert events[1]["type"] == "match_start"
 
         # Timers should be reset
         assert manager.timer_manager.spike_planted_at is None
         assert manager.timer_manager.round_ended_at is None
+
+    def test_phantom_round_correction_preround_to_active(
+        self, dummy_video_path, vlr_metadata, temp_dir
+    ):
+        """Test phantom round correction on PREROUND -> ACTIVE_ROUND transition."""
+        manager = GameStateManager(
+            video_path=dummy_video_path,
+            vlr_metadata=vlr_metadata,
+            output_dir=temp_dir / "output",
+        )
+
+        # Simulate: round 1 played normally
+        manager._handle_phase_transition(None, Phase.PREROUND, 0.0)       # round 1 preround
+        manager._handle_phase_transition(Phase.PREROUND, Phase.ACTIVE_ROUND, 5.0)  # round 1 start
+
+        # Score updated: team1 wins round 1
+        manager.round_manager.current_score = {"team1": 1, "team2": 0}
+
+        # Simulate: phantom round (replayed broadcast)
+        manager._handle_phase_transition(Phase.ACTIVE_ROUND, Phase.PREROUND, 100.0)  # round 2 preround (phantom)
+        # Add some phantom events to the buffer
+        manager.event_collector.add_event("death", timestamp=105.0, player="player1")
+        manager.event_collector.add_event("kill", timestamp=106.0, killer="player2")
+
+        # Another preround without score change -> round 3 (actually should be round 2)
+        manager._handle_phase_transition(Phase.PREROUND, Phase.ACTIVE_ROUND, 110.0)
+
+        # Correction should have happened:
+        # expected = 1 + 0 + 1 = 2, current was 3 -> corrected to 2
+        assert manager.round_manager.current_round == 2
+
+        # The phantom events should have been discarded
+        # Only committed events (from flush) + the new round_start should exist
+        all_events = manager.event_collector.get_all_events()
+        round_starts = [e for e in all_events if e["type"] == "round_start"]
+        # Should have round 1 start and round 2 start (corrected)
+        assert len(round_starts) == 2
+        assert round_starts[0]["round_number"] == 1
+        assert round_starts[1]["round_number"] == 2
+
+    def test_phantom_round_correction_post_to_active(
+        self, dummy_video_path, vlr_metadata, temp_dir
+    ):
+        """Test phantom round correction on POST_ROUND/None -> ACTIVE_ROUND transition."""
+        manager = GameStateManager(
+            video_path=dummy_video_path,
+            vlr_metadata=vlr_metadata,
+            output_dir=temp_dir / "output",
+        )
+
+        # Simulate: round 1 via POST_ROUND -> ACTIVE_ROUND (skipped preround)
+        manager._handle_phase_transition(None, Phase.ACTIVE_ROUND, 5.0)  # round 1 start
+
+        # Score updated: team1 wins round 1
+        manager.round_manager.current_score = {"team1": 1, "team2": 0}
+
+        # Simulate: phantom round via POST_ROUND -> ACTIVE_ROUND
+        manager._handle_phase_transition(Phase.ACTIVE_ROUND, Phase.POST_ROUND, 90.0)
+        # Add phantom events
+        manager.event_collector.add_event("death", timestamp=95.0, player="player1")
+
+        manager._handle_phase_transition(Phase.POST_ROUND, Phase.ACTIVE_ROUND, 110.0)
+
+        # expected = 1 + 0 + 1 = 2, current was 3 -> corrected to 2
+        assert manager.round_manager.current_round == 2
+
+        all_events = manager.event_collector.get_all_events()
+        round_starts = [e for e in all_events if e["type"] == "round_start"]
+        assert round_starts[-1]["round_number"] == 2
+
+    def test_no_correction_when_round_matches_score(
+        self, dummy_video_path, vlr_metadata, temp_dir
+    ):
+        """Test that no correction happens when round number matches score."""
+        manager = GameStateManager(
+            video_path=dummy_video_path,
+            vlr_metadata=vlr_metadata,
+            output_dir=temp_dir / "output",
+        )
+
+        # Normal progression: round 1
+        manager._handle_phase_transition(None, Phase.PREROUND, 0.0)
+        manager._handle_phase_transition(Phase.PREROUND, Phase.ACTIVE_ROUND, 5.0)
+
+        # Score is 0-0, expected = 1, current = 1 -> no correction
+        assert manager.round_manager.current_round == 1
+        all_events = manager.event_collector.get_all_events()
+        assert len([e for e in all_events if e["type"] == "round_start"]) == 1
 
     def test_repr(self, dummy_video_path, vlr_metadata, temp_dir):
         """Test string representation."""
