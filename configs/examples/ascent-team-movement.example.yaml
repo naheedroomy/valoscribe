@@ -1,0 +1,178 @@
+{
+  "schema_version": 1,
+  "run": {
+    "run_id": "ascent-team-movement-mvp001",
+    "description": "Five source-verified partial attack-round intervals; opening windows included, not full rounds.",
+    "sample_fps": 4.0,
+    "output_root": ".local/runs",
+    "debug_level": "summary",
+    "opening_window_seconds": 8.0,
+    "opening_window_definition": "First 8 usable seconds after live_start_offset_seconds; excluded/replay samples are gaps and do not count toward usable opening coverage."
+  },
+  "source": {
+    "video_path": "../VOD/YTDown.com_YouTube_Media_4LEGEQ8KBS0_100T-vs-LOUD-VCT-Americas-Stage-2-Playoffs-Grand-Final-Map-3-Ascent_001_1080p.mp4",
+    "expected_width": 1920,
+    "expected_height": 1080,
+    "sha256": "a2feb25b842b6c1c2baa17f8ef0c5ecfe1816bd058a1c256350fa95900454c44"
+  },
+  "map": {
+    "id": "ascent",
+    "canonical_width": 2048,
+    "canonical_height": 2048,
+    "asset_path": "src/valoscribe/config/maps/ascent_public_content_13_06.png",
+    "asset_sha256": "6094459e109b1f4e9d500277ebc4ce1392dd98fb4f2d92005be932105be8a593",
+    "zone_config": "configs/maps/ascent.yaml"
+  },
+  "broadcast": {
+    "profile_id": "vct-americas-2026-stage2-grand-final-1080p-manual-candidate",
+    "calibration_status": "pending_human_review",
+    "minimap_crop": {
+      "x": 70,
+      "y": 50,
+      "width": 360,
+      "height": 400,
+      "orientation": "rotate_90_ccw"
+    },
+    "transform": {
+      "method": "affine",
+      "input_coordinates": "raw_crop_pixels_before_orientation_transform",
+      "output_coordinates": "canonical_image_pixels",
+      "matrix": [
+        [
+          -0.0326733681,
+          4.9397239044,
+          48.6174636631
+        ],
+        [
+          -4.9208259748,
+          -0.0087414481,
+          1902.8049429962
+        ]
+      ],
+      "training_points": 10,
+      "training_residual_mean_rms_max_px": [
+        1.1604,
+        1.3662,
+        2.4751
+      ],
+      "heldout_max_px": {
+        "2460": 9.1376,
+        "2820": 7.2684,
+        "2940": 7.2684
+      },
+      "calibration_status": "candidate_not_accepted"
+    },
+    "color_ranges_hsv_candidate_only": [
+      {
+        "lower": [
+          0,
+          50,
+          50
+        ],
+        "upper": [
+          15,
+          255,
+          255
+        ]
+      },
+      {
+        "lower": [
+          165,
+          50,
+          50
+        ],
+        "upper": [
+          179,
+          255,
+          255
+        ]
+      }
+    ]
+  },
+  "team": {
+    "name": "100 Thieves",
+    "short_name": "100T",
+    "side": "attack",
+    "side_evidence": "First-half source scoreboard/map side review; source-specific, do not generalize broadcast color to side.",
+    "broadcast_slot": "right",
+    "broadcast_color_label": "red (source-specific candidate)"
+  },
+  "marker_detection": {
+    "status": "candidate_parameters_only",
+    "min_area_px": 5,
+    "max_area_px": 500,
+    "min_confidence": 0.35,
+    "morphology_kernel_px": 3,
+    "merge_distance_px": 8
+  },
+  "rounds": [
+    {
+      "round_id": "map3-round4",
+      "source_start_seconds": 263.0,
+      "source_end_seconds": 330,
+      "side": "attack",
+      "live_start_offset_seconds": 0.0,
+      "analysis_end_offset_seconds": null,
+      "selection_note": "t=263 is first live timer 1:39 after freeze countdown at t=262.",
+      "excluded_intervals": []
+    },
+    {
+      "round_id": "map3-round5",
+      "source_start_seconds": 379.0,
+      "source_end_seconds": 420,
+      "side": "attack",
+      "live_start_offset_seconds": 0.0,
+      "analysis_end_offset_seconds": null,
+      "selection_note": "t=379 is first live timer 1:40; t=378 is pre-round 0:00.",
+      "excluded_intervals": []
+    },
+    {
+      "round_id": "map3-round6",
+      "source_start_seconds": 540.0,
+      "source_end_seconds": 600,
+      "side": "attack",
+      "live_start_offset_seconds": 0.0,
+      "analysis_end_offset_seconds": null,
+      "selection_note": "t=540 is first live timer 1:39; t=539 is pre-round 0:00.",
+      "excluded_intervals": []
+    },
+    {
+      "round_id": "map3-round7",
+      "source_start_seconds": 790.0,
+      "source_end_seconds": 870,
+      "side": "attack",
+      "live_start_offset_seconds": 0.0,
+      "analysis_end_offset_seconds": null,
+      "selection_note": "t=790 is first live timer 1:39; t=789 is pre-round 0:00.",
+      "excluded_intervals": []
+    },
+    {
+      "round_id": "map3-round9",
+      "source_start_seconds": 971.0,
+      "source_end_seconds": 1020,
+      "side": "attack",
+      "live_start_offset_seconds": 4.0,
+      "analysis_end_offset_seconds": null,
+      "selection_note": "t=975 first live timer 1:39; t=971\u2013975 is replay/transition and excluded, not opening coverage.",
+      "excluded_intervals": [
+        {
+          "start_seconds": 971.0,
+          "end_seconds": 975.0,
+          "reason": "Broadcast replay/transition before live Round 9; excluded from usable opening evidence."
+        }
+      ]
+    }
+  ],
+  "excluded_rounds": [
+    {
+      "round_id": "map3-round8",
+      "reason": "Source transitions to crowd/desk footage around 930s; not used."
+    }
+  ],
+  "evidence_paths": {
+    "opening_start_contact": ".local/runs/mvp001/calibration/opening-start-contact.jpg",
+    "candidate_zone_overlay": ".local/runs/mvp001/calibration/ascent-zone-candidate-overlay.png",
+    "transform_overlay_contact": ".local/runs/mvp001/calibration/selected-five-windows-transform-contact.jpg",
+    "crop_contact": ".local/runs/mvp001/calibration/selected-five-windows-crop-contact.jpg"
+  }
+}
