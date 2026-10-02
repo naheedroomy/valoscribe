@@ -6,14 +6,14 @@ Matches against attack and defense templates to identify both agent and side.
 """
 
 from __future__ import annotations
-from typing import Optional
+
 from pathlib import Path
+from typing import Any, Optional
 
 import cv2
 import numpy as np
 
 from valoscribe.detectors.cropper import Cropper
-from valoscribe.types.detections import AgentInfo
 from valoscribe.utils.logger import get_logger
 
 log = get_logger(__name__)
@@ -61,7 +61,7 @@ class ActiveRoundAgentDetector:
             f"templates: {len(self.templates)}, method: {match_method})"
         )
 
-    def _load_templates(self) -> dict[str, dict]:
+    def _load_templates(self) -> dict[str, dict[str, Any]]:
         """
         Load agent templates from template directory.
 
@@ -77,7 +77,7 @@ class ActiveRoundAgentDetector:
                 "agent_name": {"image": ndarray, "agent": "agent_name"},
             }
         """
-        templates = {}
+        templates: dict[str, dict[str, Any]] = {}
 
         if not self.template_dir.exists():
             log.warning(f"Template directory does not exist: {self.template_dir}")
@@ -171,7 +171,7 @@ class ActiveRoundAgentDetector:
 
         # Get agent crop (check for "agent_icon" key - same as preround)
         if "agent_icon" not in player_crop_data:
-            log.warning(f"Agent icon region not found in player crop data")
+            log.warning("Agent icon region not found in player crop data")
             return None
 
         agent_crop = player_crop_data["agent_icon"]
@@ -190,7 +190,8 @@ class ActiveRoundAgentDetector:
         agent_name, confidence = best_match
 
         log.debug(
-            f"Player {player_index}: {agent_name} with confidence {confidence:.2f} (greyscale={greyscale})"
+            f"Player {player_index}: {agent_name} with confidence {confidence:.2f} "
+            f"(greyscale={greyscale})"
         )
 
         return agent_name
@@ -217,7 +218,7 @@ class ActiveRoundAgentDetector:
                 preprocessed = cv2.cvtColor(preprocessed, cv2.COLOR_BGR2GRAY)
 
         best_confidence = 0.0
-        best_agent = None
+        best_agent: Optional[str] = None
 
         # Try matching each template
         for agent_name, template_data in self.templates.items():
@@ -229,7 +230,10 @@ class ActiveRoundAgentDetector:
                     template_img = cv2.cvtColor(template_img, cv2.COLOR_BGR2GRAY)
 
             # Skip if template is larger than crop (can't match)
-            if template_img.shape[0] > preprocessed.shape[0] or template_img.shape[1] > preprocessed.shape[1]:
+            if (
+                template_img.shape[0] > preprocessed.shape[0]
+                or template_img.shape[1] > preprocessed.shape[1]
+            ):
                 log.debug(
                     f"Template {agent_name} ({template_img.shape[:2]}) larger than crop "
                     f"({preprocessed.shape[:2]}), skipping"
@@ -247,7 +251,8 @@ class ActiveRoundAgentDetector:
             confidence = max(0.0, min(1.0, confidence))
 
             log.debug(
-                f"Template {agent_name}: confidence = {confidence:.3f} at position {max_loc} (greyscale={greyscale})"
+                f"Template {agent_name}: confidence = {confidence:.3f} at position {max_loc} "
+                f"(greyscale={greyscale})"
             )
 
             # Track best match
@@ -258,8 +263,12 @@ class ActiveRoundAgentDetector:
         # Check if best match meets threshold
         if best_confidence < self.min_confidence:
             log.debug(
-                f"Best match confidence {best_confidence:.2f} below threshold {self.min_confidence} (greyscale={greyscale})"
+                f"Best match confidence {best_confidence:.2f} below threshold "
+                f"{self.min_confidence} (greyscale={greyscale})"
             )
+            return None
+
+        if best_agent is None:
             return None
 
         return best_agent, best_confidence
@@ -303,7 +312,7 @@ class ActiveRoundAgentDetector:
             Tuple of (agent_name or None, agent_crop, debug_info)
             debug_info contains match scores for all templates
         """
-        debug_info = {"error": None}
+        debug_info: dict[str, Any] = {"error": None}
 
         # Get active round crops
         player_crops = self.cropper.crop_player_info(frame)
@@ -318,7 +327,10 @@ class ActiveRoundAgentDetector:
         debug_info["crop_keys"] = list(player_crop_data.keys())
 
         if "agent_icon" not in player_crop_data:
-            debug_info["error"] = f"'agent_icon' key not in crop_data. Available keys: {list(player_crop_data.keys())}"
+            debug_info["error"] = (
+                "'agent_icon' key not in crop_data. Available keys: "
+                f"{list(player_crop_data.keys())}"
+            )
             return None, np.array([]), debug_info
 
         agent_crop = player_crop_data["agent_icon"]
@@ -332,12 +344,15 @@ class ActiveRoundAgentDetector:
         preprocessed = self._preprocess_crop(agent_crop)
 
         # Get match scores for all templates
-        match_scores = {}
+        match_scores: dict[str, dict[str, Any]] = {}
         for agent_name, template_data in self.templates.items():
             template_img = template_data["image"]
 
             # Skip if template is larger than crop
-            if template_img.shape[0] > preprocessed.shape[0] or template_img.shape[1] > preprocessed.shape[1]:
+            if (
+                template_img.shape[0] > preprocessed.shape[0]
+                or template_img.shape[1] > preprocessed.shape[1]
+            ):
                 match_scores[agent_name] = {
                     "agent": agent_name,
                     "confidence": 0.0,
@@ -359,6 +374,6 @@ class ActiveRoundAgentDetector:
         debug_info["match_scores"] = match_scores
 
         # Run detection
-        agent_name = self.detect(frame, player_index)
+        detected_agent = self.detect(frame, player_index)
 
-        return agent_name, agent_crop, debug_info
+        return detected_agent, agent_crop, debug_info

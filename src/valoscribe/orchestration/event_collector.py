@@ -1,6 +1,7 @@
 """Event collector for aggregating discrete game events."""
 
 from __future__ import annotations
+
 from typing import Optional
 
 from valoscribe.orchestration.killfeed_deduplicator import KillfeedDeduplicator
@@ -56,7 +57,10 @@ class EventCollector:
         if isinstance(event, dict):
             # Dict format
             self.events.append(event)
-            log.debug(f"Event added: {event.get('type', 'unknown')} at {event.get('timestamp', 0):.2f}s")
+            log.debug(
+                f"Event added: {event.get('type', 'unknown')} "
+                f"at {event.get('timestamp', 0):.2f}s"
+            )
         else:
             # Separate params format
             if timestamp is None:
@@ -102,7 +106,12 @@ class EventCollector:
         """
         added_count = 0
 
-        for detection, player_info in killfeed_detections:
+        for killfeed_event in killfeed_detections:
+            if isinstance(killfeed_event, tuple):
+                detection, player_info = killfeed_event
+            else:
+                detection, player_info = killfeed_event, {}
+
             # Check if duplicate
             if self.killfeed_dedup.is_duplicate(timestamp, detection):
                 continue

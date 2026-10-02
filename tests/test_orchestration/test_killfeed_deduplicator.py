@@ -1,6 +1,7 @@
 """Unit tests for KillfeedDeduplicator."""
 
 from __future__ import annotations
+
 import pytest
 
 from valoscribe.orchestration.killfeed_deduplicator import KillfeedDeduplicator

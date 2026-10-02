@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0",
+  "profile_id": "vct_americas_2026_stage2_final_1080p_candidate",
+  "name": "VCT Americas Stage 2 Grand Final Ascent 1080p candidate",
+  "frame_width": 1920,
+  "frame_height": 1080,
+  "calibration_status": "pending",
+  "source_provenance": "Measured from a locally supplied external VOD; see docs/minimap-calibration.md. The VOD is not included in this repository.",
+  "minimap": {
+    "x": 70,
+    "y": 50,
+    "width": 360,
+    "height": 400,
+    "orientation": "rotate_90_ccw"
+  },
+  "regions": {}
+}

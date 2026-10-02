@@ -5,17 +5,17 @@ Extracts the current round number from the game HUD using OCR.
 """
 
 from __future__ import annotations
-from typing import Optional
-import re
 
-import numpy as np
+import re
+from typing import Optional
 
 import cv2
+import numpy as np
 
 from valoscribe.detectors.cropper import Cropper
-from valoscribe.utils.ocr import OCREngine
 from valoscribe.types.detections import RoundInfo
 from valoscribe.utils.logger import get_logger
+from valoscribe.utils.ocr import OCREngine
 
 log = get_logger(__name__)
 
@@ -155,7 +155,7 @@ class RoundDetector:
         match = re.search(r"(?:ROUND\s+)?(\d+)\s*/\s*\d+", text, re.IGNORECASE)
         if match:
             round_num = int(match.group(1))
-            if 1 <= round_num <= 24:
+            if 1 <= round_num <= 100:
                 return round_num
             # If first number is invalid, don't fall through to other patterns
             return None
@@ -164,7 +164,7 @@ class RoundDetector:
         match = re.search(r"ROUND\s+(\d+)", text, re.IGNORECASE)
         if match:
             round_num = int(match.group(1))
-            if 1 <= round_num <= 24:
+            if 1 <= round_num <= 100:
                 return round_num
 
         # Try to extract just a number at start of string (fallback)
@@ -172,7 +172,7 @@ class RoundDetector:
         if match:
             round_num = int(match.group(1))
             # Validate it's in reasonable range
-            if 1 <= round_num <= 24:
+            if 1 <= round_num <= 100:
                 return round_num
 
         return None

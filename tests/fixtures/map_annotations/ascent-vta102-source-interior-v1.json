@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0",
+  "issue": "VTA-102",
+  "annotation_status": "provisional_source_interior_samples",
+  "geometry_status": "pending",
+  "annotation_kind": "reviewer_labeled_interior_sample_rectangles",
+  "review": {
+    "reviewer_role": "independent reviewer",
+    "review_method": "conservative rectangles annotated on the frozen canonical pixel mapping while preserving source labels",
+    "reviewer_identity_recorded": false,
+    "uncertainty": "Rectangle bounds are annotations, not measured geometry; no statistical uncertainty was supplied. Labels derive from a community overview and do not establish plant boundaries, full zone extents, or walkability."
+  },
+  "source": {
+    "description": "Community tactical overview; verification input only and not redistributed.",
+    "local_path": "/tmp/vta102-ascent-community-overview.png",
+    "sha256": "c62eea459c56980bf751bdecb0583f6a02da72095251c09fe74e5b4caccb1a76",
+    "dimensions_px": {
+      "width": 1656,
+      "height": 1656
+    }
+  },
+  "canonical_mapping": {
+    "asset_path": "src/valoscribe/config/maps/ascent_public_content_13_06.png",
+    "sha256": "6094459e109b1f4e9d500277ebc4ce1392dd98fb4f2d92005be932105be8a593",
+    "dimensions_px": {
+      "width": 2048,
+      "height": 2048
+    },
+    "coordinate_convention": "canonical image pixels; rectangle x0,y0 inclusive and x1,y1 exclusive",
+    "mapping_manifest_path": "src/valoscribe/config/ascent_vta102_correspondence.json",
+    "mapping_manifest_sha256": "6cc1c10cd39505a37f1e69a26104cf5430e3baac2b52d54778323234427ad991",
+    "mapping_manifest_source_sha256": "c62eea459c56980bf751bdecb0583f6a02da72095251c09fe74e5b4caccb1a76",
+    "mapping_manifest_canonical_sha256": "6094459e109b1f4e9d500277ebc4ce1392dd98fb4f2d92005be932105be8a593"
+  },
+  "source_annotations": [
+    {"label": "A Site", "rectangle_px": [642, 269, 678, 301], "center_px": [660, 285]},
+    {"label": "B Site", "rectangle_px": [602, 1652, 638, 1688], "center_px": [620, 1670]},
+    {"label": "Defender Spawn", "rectangle_px": [307, 812, 343, 848], "center_px": [325, 830]},
+    {"label": "Attacker Spawn", "rectangle_px": [1570, 1080, 1610, 1120], "center_px": [1590, 1100]},
+    {"label": "Mid Courtyard", "rectangle_px": [1092, 1054, 1124, 1086], "center_px": [1108, 1070]},
+    {"label": "B Main", "rectangle_px": [805, 1330, 839, 1364], "center_px": [822, 1347]}
+  ],
+  "rejected_annotations": [
+    {
+      "label": "A Main",
+      "rectangle_px": [916, 394, 952, 426],
+      "center_px": [934, 410],
+      "rejection_reason": "The exact reviewed rectangle midpoint has canonical alpha 0 and is outside the canonical alpha interior; retained only as rejected review evidence, not an accepted annotation."
+    }
+  ],
+  "derived_geometry": {
+    "walkable_areas": [],
+    "site_polygons": [],
+    "spawn_polygons": [],
+    "named_zones": [],
+    "zone_at_promotion": false
+  },
+  "use_restrictions": [
+    "Annotations are provisional interior samples only, not zone outlines or geometry.",
+    "Do not infer plant boundaries, complete walkable masks, polygon extents, or broadcast orientation.",
+    "Keep annotations separate from production map geometry until full VTA-102 acceptance."
+  ],
+  "acceptance": {
+    "full_vta102_acceptance": "pending",
+    "remaining": "independently reviewed true site and spawn extents, walkable geometry, and named-zone polygons with evidence and held-out validation"
+  }
+}

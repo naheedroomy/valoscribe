@@ -1,8 +1,8 @@
 """Unit tests for StateValidator."""
 
 from __future__ import annotations
+
 import pytest
-from pathlib import Path
 
 from valoscribe.orchestration.state_validator import StateValidator
 
@@ -51,24 +51,25 @@ class TestStateValidator:
 
         events = validator.validate_player_state(current, previous, metadata, 10.0)
 
-        assert len(events) == 1
-        assert events[0]["type"] == "death"
-        assert events[0]["player"] == "brawk"
-        assert events[0]["team"] == "NRG"
-        assert events[0]["agent"] == "sova"
-        assert events[0]["timestamp"] == 10.0
+        # Death transitions are emitted by GameStateManager, not this validator.
+        assert events == []
 
     def test_revival_detection(self, validator, metadata):
         """Test detection of revival event."""
         previous = {"alive": False, "health": 0}
         current = {"alive": True, "health": 100}
 
-        events = validator.validate_player_state(current, previous, metadata, 15.0)
+        events = validator.validate_player_state(
+            current, previous, metadata, 15.0, team_has_sage=True
+        )
 
-        assert len(events) == 1
-        assert events[0]["type"] == "revival"
-        assert events[0]["player"] == "brawk"
-        assert events[0]["timestamp"] == 15.0
+        assert events == [{
+            "type": "revival",
+            "timestamp": 15.0,
+            "player": "brawk",
+            "team": "NRG",
+            "agent": "sova",
+        }]
 
     def test_no_alive_change_no_event(self, validator, metadata):
         """Test that no event is generated when alive status doesn't change."""
@@ -86,28 +87,41 @@ class TestStateValidator:
         current = {"alive": True, "ability_1": 1}
 
         events = validator.validate_player_state(current, previous, metadata, 10.0)
+        assert events == []  # First frame only starts the confirmation.
 
-        assert len(events) == 1
-        assert events[0]["type"] == "ability_used"
-        assert events[0]["ability"] == "ability_1"
-        assert events[0]["charges_used"] == 1
-        assert events[0]["remaining_charges"] == 1
-        assert events[0]["player"] == "brawk"
+        events = validator.validate_player_state(current, current, metadata, 10.1)
+        assert events == [{
+            "type": "ability_used",
+            "timestamp": 10.0,
+            "player": "brawk",
+            "team": "NRG",
+            "agent": "sova",
+            "ability": validator.agent_config["sova"]["ability_1"]["name"],
+            "charges_used": 1,
+            "remaining_charges": 1,
+        }]
 
     def test_ability_recharge_valid(self, validator, metadata):
         """Test detection of valid ability recharge."""
-        # Omen's ability_1 is rechargeable
+        # Omen's ability_3 is rechargeable.
         metadata_omen = {"name": "marved", "team": "NRG", "agent": "omen"}
-        previous = {"alive": True, "ability_1": 1}
-        current = {"alive": True, "ability_1": 2}
+        previous = {"alive": True, "ability_3": 1}
+        current = {"alive": True, "ability_3": 2}
 
         events = validator.validate_player_state(current, previous, metadata_omen, 10.0)
+        assert events == []
 
-        assert len(events) == 1
-        assert events[0]["type"] == "ability_recharged"
-        assert events[0]["ability"] == "ability_1"
-        assert events[0]["charges_gained"] == 1
-        assert events[0]["total_charges"] == 2
+        events = validator.validate_player_state(current, current, metadata_omen, 10.1)
+        assert events == [{
+            "type": "ability_recharged",
+            "timestamp": 10.0,
+            "player": "marved",
+            "team": "NRG",
+            "agent": "omen",
+            "ability": validator.agent_config["omen"]["ability_3"]["name"],
+            "charges_gained": 1,
+            "total_charges": 2,
+        }]
 
     def test_ability_recharge_invalid(self, validator, metadata):
         """Test that invalid recharge (non-rechargeable ability) is logged."""
@@ -189,12 +203,11 @@ class TestStateValidator:
         }
 
         events = validator.validate_player_state(current, previous, metadata, 10.0)
+        assert [event["type"] for event in events] == ["ultimate_used"]
 
-        # Should have 3 events: 2 abilities + 1 ultimate
-        assert len(events) == 3
-        event_types = [e["type"] for e in events]
-        assert event_types.count("ability_used") == 2
-        assert event_types.count("ultimate_used") == 1
+        events = validator.validate_player_state(current, current, metadata, 10.1)
+        assert [event["type"] for event in events] == ["ability_used", "ability_used"]
+        assert {event["timestamp"] for event in events} == {10.0}
 
     def test_unknown_agent_skips_ability_validation(self, validator):
         """Test that unknown agent skips ability validation."""
@@ -223,13 +236,17 @@ class TestStateValidator:
         }
 
         events = validator.validate_player_state(current, previous, metadata, 10.0)
+        assert events == []
 
-        # Should detect usage of all 3 abilities
+        events = validator.validate_player_state(current, current, metadata, 10.1)
         assert len(events) == 3
-        abilities_used = [e["ability"] for e in events]
-        assert "ability_1" in abilities_used
-        assert "ability_2" in abilities_used
-        assert "ability_3" in abilities_used
+        abilities_used = {event["ability"] for event in events}
+        configured_abilities = {
+            validator.agent_config["sova"][key]["name"]
+            for key in ("ability_1", "ability_2", "ability_3")
+        }
+        assert abilities_used == configured_abilities
+        assert all(event["timestamp"] == 10.0 for event in events)
 
     def test_repr(self, validator):
         """Test string representation."""

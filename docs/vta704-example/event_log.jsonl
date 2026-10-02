@@ -1,0 +1,4 @@
+{"type":"round_start","timestamp":120.0,"round_number":4,"phase":"OPENING","synthetic_fixture":true}
+{"type":"spike_plant","timestamp":154.25,"synthetic_fixture":true}
+{"type":"round_end","timestamp":179.5,"round_number":4,"synthetic_fixture":true}
+{"type":"round_start","timestamp":180.5,"round_number":5,"synthetic_fixture":true}

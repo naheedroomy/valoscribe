@@ -1,13 +1,14 @@
 """Unit tests for video reader module."""
 
 from __future__ import annotations
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock, PropertyMock
-import pytest
-import numpy as np
 
-from valoscribe.video.reader import FileVideoSource, VideoReader, read_video_frames
+from unittest.mock import MagicMock, Mock, patch
+
+import numpy as np
+import pytest
+
 from valoscribe.types.video import FrameInfo
+from valoscribe.video.reader import FileVideoSource, VideoReader, read_video_frames
 
 
 class TestFileVideoSource:
@@ -21,7 +22,7 @@ class TestFileVideoSource:
             mock_cap.isOpened.return_value = True
             mock_cap.read.return_value = (True, np.zeros((1080, 1920, 3), dtype=np.uint8))
             mock_cap.get.side_effect = lambda prop: {
-                3: 100,  # CAP_PROP_POS_FRAMES
+                1: 100,  # CAP_PROP_POS_FRAMES
                 5: 60.0,  # CAP_PROP_FPS
                 7: 1000,  # CAP_PROP_FRAME_COUNT
                 3: 1920,  # CAP_PROP_FRAME_WIDTH
@@ -262,7 +263,7 @@ class TestVideoReader:
 
     def test_start_time_filter(self, mock_source):
         """Test starting from specific timestamp."""
-        reader = VideoReader(mock_source, start_time_sec=2.0)
+        VideoReader(mock_source, start_time_sec=2.0)
 
         # Should seek to frame 120 (2 seconds * 60 fps)
         mock_source.set_position.assert_called_with(120)

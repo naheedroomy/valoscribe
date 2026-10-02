@@ -1,9 +1,12 @@
 from __future__ import annotations
-from pathlib import Path
-from typing import Optional, Callable, Dict, Any
 
-from tqdm import tqdm
-from yt_dlp import YoutubeDL
+import shutil
+import subprocess
+from pathlib import Path
+from typing import Any, Callable, Dict, Optional
+
+from tqdm import tqdm  # type: ignore[import-untyped]
+from yt_dlp import YoutubeDL  # type: ignore[import-untyped]
 
 from valoscribe.types.video import DownloadResult
 from valoscribe.utils.logger import get_logger
@@ -162,7 +165,7 @@ def download_youtube(
         "best"
     )
 
-    hooks = [_TqdmProgressHook()]
+    hooks: list[Callable[[Dict[str, Any]], None]] = [_TqdmProgressHook()]
     if on_progress:
         hooks.append(on_progress)
 
@@ -192,8 +195,13 @@ def download_youtube(
     trim_duration = None
 
     if start_time is not None:
+        if duration is None:
+            duration = 5400
         end_time = start_time + duration
-        log.info(f"Will download and trim section: {start_time}s to {end_time}s ({duration}s duration)")
+        log.info(
+            f"Will download and trim section: {start_time}s to {end_time}s "
+            f"({duration}s duration)"
+        )
         trim_after_download = True
         trim_start = start_time
         trim_duration = duration
@@ -235,9 +243,7 @@ def download_youtube(
 
     # Trim video if timestamped section was requested
     if trim_after_download:
-        import subprocess
-        import shutil
-
+        assert trim_start is not None and trim_duration is not None
         log.info(f"Trimming video: {trim_start}s to {trim_start + trim_duration}s")
 
         # Create trimmed output path

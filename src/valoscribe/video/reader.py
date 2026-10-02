@@ -6,8 +6,9 @@ and is designed to be extensible for future streaming sources (YouTube, Twitch).
 """
 
 from __future__ import annotations
+
 from pathlib import Path
-from typing import Optional, Iterator, Callable, Protocol
+from typing import Callable, Iterator, Optional, Protocol
 
 import cv2
 import numpy as np
@@ -182,7 +183,11 @@ class VideoReader:
             log.info(f"Seeking to start frame {start_frame} (time: {start_time_sec}s)")
             self._source.set_position(start_frame)
             actual_position = self._source.get_position()
-            log.info(f"After seek, actual position: {actual_position} (time: {actual_position / self._source.get_fps():.2f}s)")
+            actual_time = actual_position / self._source.get_fps()
+            log.info(
+                f"After seek, actual position: {actual_position} "
+                f"(time: {actual_time:.2f}s)"
+            )
             if abs(actual_position - start_frame) > 1:
                 log.warning(
                     f"Seek imprecise: requested frame {start_frame}, got {actual_position} "

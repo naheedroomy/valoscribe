@@ -1,11 +1,13 @@
 """Unit tests for pre-round credits detector."""
 
 from __future__ import annotations
-from unittest.mock import Mock
+
 from pathlib import Path
-import pytest
-import numpy as np
+from unittest.mock import Mock
+
 import cv2
+import numpy as np
+import pytest
 
 from valoscribe.detectors.preround_credits_detector import PreroundCreditsDetector
 from valoscribe.types.detections import CreditsInfo
@@ -129,7 +131,9 @@ class TestPreroundCreditsDetector:
 
     def test_detect_no_template_loaded(self, mock_cropper):
         """Test detection fails gracefully when no template is loaded."""
-        detector = PreroundCreditsDetector(mock_cropper, template_path=Path("/nonexistent/path.png"))
+        detector = PreroundCreditsDetector(
+            mock_cropper, template_path=Path("/nonexistent/path.png")
+        )
 
         frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
         result = detector.detect(frame, player_index=0)
@@ -180,7 +184,9 @@ class TestPreroundCreditsDetector:
 
         assert result is None
 
-    def test_detect_credits_visible_high_confidence(self, detector_with_template, mock_cropper, mock_template):
+    def test_detect_credits_visible_high_confidence(
+        self, detector_with_template, mock_cropper, mock_template
+    ):
         """Test detection when pre-round credits icon is clearly visible."""
         # Create credits crop that will match after preprocessing
         credits_crop = self.create_matching_crop(mock_template)
@@ -270,7 +276,9 @@ class TestPreroundCreditsDetector:
         assert preprocessed.size > 0
         assert debug_info["max_confidence"] < 0.7
 
-    def test_is_preround_frame_all_visible(self, detector_with_template, mock_cropper, mock_template):
+    def test_is_preround_frame_all_visible(
+        self, detector_with_template, mock_cropper, mock_template
+    ):
         """Test is_preround_frame when all players have visible credits (clear pre-round)."""
         # Create matching crops for all 10 players
         credits_crop = self.create_matching_crop(mock_template)
@@ -316,7 +324,9 @@ class TestPreroundCreditsDetector:
 
         assert is_preround is False
 
-    def test_is_preround_frame_exactly_at_threshold(self, detector_with_template, mock_cropper, mock_template):
+    def test_is_preround_frame_exactly_at_threshold(
+        self, detector_with_template, mock_cropper, mock_template
+    ):
         """Test is_preround_frame when exactly at threshold (50%)."""
         matching_crop = self.create_matching_crop(mock_template)
         non_matching_crop = np.random.randint(0, 50, (30, 80, 3), dtype=np.uint8)
@@ -349,7 +359,9 @@ class TestPreroundCreditsDetector:
         is_preround_below = detector_with_template.is_preround_frame(frame, threshold=0.51)
         assert is_preround_below is False
 
-    def test_is_preround_frame_custom_threshold(self, detector_with_template, mock_cropper, mock_template):
+    def test_is_preround_frame_custom_threshold(
+        self, detector_with_template, mock_cropper, mock_template
+    ):
         """Test is_preround_frame with custom thresholds."""
         matching_crop = self.create_matching_crop(mock_template)
         non_matching_crop = np.random.randint(0, 50, (30, 80, 3), dtype=np.uint8)

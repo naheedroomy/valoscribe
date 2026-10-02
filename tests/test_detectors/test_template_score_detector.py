@@ -1,11 +1,12 @@
 """Unit tests for template-based score detector."""
 
 from __future__ import annotations
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
-import pytest
-import numpy as np
+
+from unittest.mock import Mock, patch
+
 import cv2
+import numpy as np
+import pytest
 
 from valoscribe.detectors.template_score_detector import TemplateScoreDetector
 from valoscribe.types.detections import ScoreInfo
@@ -176,10 +177,23 @@ class TestTemplateScoreDetector:
         assert result.team1_score == 0
         assert result.team2_score == 12
 
-    def test_detect_out_of_range_team1(self, detector, mock_cropper):
-        """Test detection rejects team1 score out of range."""
+    @pytest.mark.parametrize("score", [14, 99])
+    def test_detect_overtime_score(self, detector, score):
+        """Test detection accepts overtime scores, including the upper bound."""
         detector._match_score_region = Mock(side_effect=[
-            (20, 0.95, "20"),  # team1 - out of range
+            (score, 0.95, str(score)),
+            (5, 0.92, "5"),
+        ])
+
+        result = detector.detect(np.zeros((1080, 1920, 3), dtype=np.uint8))
+
+        assert result is not None
+        assert result.team1_score == score
+
+    def test_detect_out_of_range_team1(self, detector, mock_cropper):
+        """Test detection rejects team1 score above the supported maximum."""
+        detector._match_score_region = Mock(side_effect=[
+            (100, 0.95, "100"),  # team1 - out of range
             (5, 0.92, "5"),    # team2
         ])
 
@@ -192,7 +206,7 @@ class TestTemplateScoreDetector:
         """Test detection rejects team2 score out of range."""
         detector._match_score_region = Mock(side_effect=[
             (7, 0.95, "7"),    # team1
-            (14, 0.92, "14"),  # team2 - out of range
+            (100, 0.92, "100"),  # team2 - out of range
         ])
 
         frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
@@ -253,7 +267,8 @@ class TestTemplateScoreDetector:
         """Test filtering when matches overlap significantly."""
         matches = [
             {"digit": "1", "confidence": 0.95, "x": 0, "y": 0, "w": 20, "h": 30},
-            {"digit": "7", "confidence": 0.85, "x": 5, "y": 0, "w": 20, "h": 30},  # Overlaps with "1"
+            {"digit": "7", "confidence": 0.85, "x": 5, "y": 0, "w": 20, "h": 30},
+            # Overlaps with "1"
         ]
 
         filtered = detector._filter_overlapping_matches(matches)
@@ -266,8 +281,10 @@ class TestTemplateScoreDetector:
     def test_filter_overlapping_matches_preserves_order(self, detector):
         """Test that filtering and re-sorting preserves left-to-right order."""
         matches = [
-            {"digit": "0", "confidence": 0.95, "x": 25, "y": 0, "w": 20, "h": 30},  # Right, higher conf
-            {"digit": "1", "confidence": 0.90, "x": 0, "y": 0, "w": 20, "h": 30},   # Left, lower conf
+            {"digit": "0", "confidence": 0.95, "x": 25, "y": 0, "w": 20, "h": 30},
+            # Right, higher confidence
+            {"digit": "1", "confidence": 0.90, "x": 0, "y": 0, "w": 20, "h": 30},
+            # Left, lower confidence
         ]
 
         filtered = detector._filter_overlapping_matches(matches)
@@ -351,7 +368,9 @@ class TestTemplateScoreDetector:
         ])
 
         frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
-        result, team1_preprocessed, team2_preprocessed, debug_info = detector.detect_with_debug(frame)
+        result, team1_preprocessed, team2_preprocessed, debug_info = (
+            detector.detect_with_debug(frame)
+        )
 
         assert result is not None
         assert result.team1_score == 8
@@ -366,7 +385,9 @@ class TestTemplateScoreDetector:
         mock_cropper.crop_simple_region.return_value = np.array([])
 
         frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
-        result, team1_preprocessed, team2_preprocessed, debug_info = detector.detect_with_debug(frame)
+        result, team1_preprocessed, team2_preprocessed, debug_info = (
+            detector.detect_with_debug(frame)
+        )
 
         assert result is None
         assert team1_preprocessed.size == 0
@@ -411,24 +432,25 @@ class TestScoreInfoValidation:
         assert info.team2_raw_text == "12"
 
     def test_score_range_validation(self):
-        """Test score must be in valid range (0-13)."""
-        # Valid cases
+        """Test score must be in valid range (0-99)."""
+        # Valid cases include overtime and the upper bound.
         ScoreInfo(team1_score=0, team2_score=0, confidence=0.9)
         ScoreInfo(team1_score=13, team2_score=13, confidence=0.9)
+        ScoreInfo(team1_score=14, team2_score=99, confidence=0.9)
 
         # Invalid cases - team1
         with pytest.raises(Exception):  # Pydantic ValidationError
             ScoreInfo(team1_score=-1, team2_score=5, confidence=0.9)
 
         with pytest.raises(Exception):
-            ScoreInfo(team1_score=14, team2_score=5, confidence=0.9)
+            ScoreInfo(team1_score=100, team2_score=5, confidence=0.9)
 
         # Invalid cases - team2
         with pytest.raises(Exception):
             ScoreInfo(team1_score=5, team2_score=-1, confidence=0.9)
 
         with pytest.raises(Exception):
-            ScoreInfo(team1_score=5, team2_score=14, confidence=0.9)
+            ScoreInfo(team1_score=5, team2_score=100, confidence=0.9)
 
     def test_confidence_range_validation(self):
         """Test confidence must be in valid range (0-1)."""

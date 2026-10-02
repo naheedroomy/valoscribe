@@ -1,26 +1,27 @@
 """Detector registry for managing all detector instances."""
 
 from __future__ import annotations
+
 from pathlib import Path
 from typing import Optional
 
+from valoscribe.detectors.ability_detector import AbilityDetector
+from valoscribe.detectors.active_round_agent_detector import ActiveRoundAgentDetector
 from valoscribe.detectors.cropper import Cropper
-from valoscribe.detectors.template_timer_detector import TemplateTimerDetector
+from valoscribe.detectors.killfeed_detector import KillfeedDetector
+from valoscribe.detectors.preround_ability_detector import PreroundAbilityDetector
+from valoscribe.detectors.preround_credits_detector import PreroundCreditsDetector
+from valoscribe.detectors.preround_ultimate_detector import PreroundUltimateDetector
+from valoscribe.detectors.round_detector import RoundDetector
+from valoscribe.detectors.template_agent_detector import TemplateAgentDetector
+from valoscribe.detectors.template_armor_detector import TemplateArmorDetector
+from valoscribe.detectors.template_health_detector import TemplateHealthDetector
 from valoscribe.detectors.template_score_detector import TemplateScoreDetector
 from valoscribe.detectors.template_spike_detector import TemplateSpikeDetector
-from valoscribe.detectors.template_health_detector import TemplateHealthDetector
-from valoscribe.detectors.template_armor_detector import TemplateArmorDetector
-from valoscribe.detectors.round_detector import RoundDetector
-from valoscribe.detectors.preround_credits_detector import PreroundCreditsDetector
-from valoscribe.detectors.template_agent_detector import TemplateAgentDetector
-from valoscribe.detectors.active_round_agent_detector import ActiveRoundAgentDetector
-from valoscribe.detectors.preround_ability_detector import PreroundAbilityDetector
-from valoscribe.detectors.preround_ultimate_detector import PreroundUltimateDetector
-from valoscribe.detectors.ability_detector import AbilityDetector
+from valoscribe.detectors.template_timer_detector import TemplateTimerDetector
 from valoscribe.detectors.ultimate_detector import UltimateDetector
-from valoscribe.detectors.killfeed_detector import KillfeedDetector
-from valoscribe.utils.ocr import OCREngine
 from valoscribe.utils.logger import get_logger
+from valoscribe.utils.ocr import OCREngine
 
 log = get_logger(__name__)
 
@@ -109,7 +110,10 @@ class DetectorRegistry:
         if agent_list:
             log.info(f"Initializing killfeed detector with {len(agent_list)} agents: {agent_list}")
         else:
-            log.info("Initializing killfeed detector with all agents (will reinitialize after first preround)")
+            log.info(
+                "Initializing killfeed detector with all agents "
+                "(will reinitialize after first preround)"
+            )
 
         self.killfeed_detector = KillfeedDetector(
             self.cropper,

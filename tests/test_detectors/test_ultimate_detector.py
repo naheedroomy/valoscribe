@@ -1,10 +1,12 @@
 """Unit tests for blob-based ultimate detector."""
 
 from __future__ import annotations
+
 from unittest.mock import Mock
-import pytest
-import numpy as np
+
 import cv2
+import numpy as np
+import pytest
 
 from valoscribe.detectors.ultimate_detector import UltimateDetector
 from valoscribe.types.detections import UltimateInfo

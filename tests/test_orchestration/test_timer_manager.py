@@ -1,10 +1,11 @@
 """Unit tests for TimerManager."""
 
 from __future__ import annotations
+
 import pytest
 
-from valoscribe.orchestration.timer_manager import TimerManager
 from valoscribe.orchestration.phase_detector import Phase
+from valoscribe.orchestration.timer_manager import TimerManager
 
 
 class TestTimerManager:
@@ -92,7 +93,7 @@ class TestTimerManager:
         )
 
         assert timers["game_timer"] is None
-        assert timers["spike_timer"] == 60.0  # 105 - 45
+        assert timers["spike_timer"] is None  # Spike timer stops in POST_ROUND.
         assert timers["post_round_timer"] == 5.0  # 105 - 100
 
     def test_spike_timer_increments(self, manager):
@@ -149,8 +150,13 @@ class TestTimerManager:
         manager.on_spike_planted(45.0)
         manager.on_round_ended(100.0)
 
+        # Spike elapsed time remains available during the active round.
+        active_timers = manager.get_timers(46.0, Phase.ACTIVE_ROUND, None)
+        assert active_timers["spike_timer"] == 1.0
+
+        # POST_ROUND suppresses the spike timer but retains the round-end timer.
         timers1 = manager.get_timers(105.0, Phase.POST_ROUND, None)
-        assert timers1["spike_timer"] == 60.0
+        assert timers1["spike_timer"] is None
         assert timers1["post_round_timer"] == 5.0
 
         # Reset for round 2

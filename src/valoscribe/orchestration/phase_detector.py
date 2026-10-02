@@ -1,16 +1,16 @@
 """Phase detection for game state orchestration."""
 
 from __future__ import annotations
+
 from enum import Enum, auto
-from typing import Optional
+from typing import Any, Optional
 
 import numpy as np
 
-from valoscribe.detectors.template_timer_detector import TemplateTimerDetector
-from valoscribe.detectors.template_spike_detector import TemplateSpikeDetector
-from valoscribe.detectors.template_score_detector import TemplateScoreDetector
 from valoscribe.detectors.preround_credits_detector import PreroundCreditsDetector
-from valoscribe.types.detections import TimerInfo, SpikeInfo, ScoreInfo, CreditsInfo
+from valoscribe.detectors.template_score_detector import TemplateScoreDetector
+from valoscribe.detectors.template_spike_detector import TemplateSpikeDetector
+from valoscribe.detectors.template_timer_detector import TemplateTimerDetector
 from valoscribe.utils.logger import get_logger
 
 log = get_logger(__name__)
@@ -77,7 +77,7 @@ class PhaseDetector:
         self,
         frame: np.ndarray,
         current_phase: Phase,
-    ) -> tuple[Phase, dict]:
+    ) -> tuple[Phase, dict[str, Any]]:
         """
         Detect the current game phase and run associated detectors.
 
@@ -94,7 +94,7 @@ class PhaseDetector:
                 "preround_credits": Optional[bool],  # True if any credits detected
             }
         """
-        detections = {
+        detections: dict[str, Any] = {
             "timer": None,
             "spike": None,
             "score": None,
@@ -153,7 +153,8 @@ class PhaseDetector:
             # If in ACTIVE_ROUND and score changed → POST_ROUND
             if current_phase == Phase.ACTIVE_ROUND and score_changed:
                 log.debug(
-                    f"Phase: POST_ROUND (score changed from {self.previous_score} to {current_score_tuple})"
+                    "Phase: POST_ROUND (score changed from "
+                    f"{self.previous_score} to {current_score_tuple})"
                 )
                 return Phase.POST_ROUND, detections
 
@@ -168,7 +169,8 @@ class PhaseDetector:
                     return Phase.NON_GAME, detections
 
                 log.debug(
-                    f"Phase: ACTIVE_ROUND (timer={timer_info.time_seconds:.1f}s indicates new round started)"
+                    "Phase: ACTIVE_ROUND (timer="
+                    f"{timer_info.time_seconds:.1f}s indicates new round started)"
                 )
                 return Phase.ACTIVE_ROUND, detections
 

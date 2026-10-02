@@ -6,7 +6,8 @@ bright colored dots in ability regions.
 """
 
 from __future__ import annotations
-from typing import Optional
+
+from typing import Any, Optional
 
 import cv2
 import numpy as np
@@ -70,7 +71,7 @@ class AbilityDetector:
             side: Which side of scoreboard ("left" or "right")
 
         Returns:
-            Dictionary with keys "ability_1", "ability_2", "ability_3" mapping to AbilityInfo or None
+            Dictionary mapping ability names to AbilityInfo or None
         """
         results = {}
 
@@ -254,18 +255,20 @@ class AbilityDetector:
         )
 
         # Create debug info
-        debug_info = {
+        debug_info: dict[str, Any] = {
             "total_blobs": num_labels - 1,
             "blob_stats": [],
         }
 
         for i in range(1, num_labels):
             area = stats[i, cv2.CC_STAT_AREA]
-            debug_info["blob_stats"].append({
-                "label": i,
-                "area": int(area),
-                "centroid": (float(centroids[i][0]), float(centroids[i][1])),
-            })
+            debug_info["blob_stats"].append(
+                {
+                    "label": i,
+                    "area": int(area),
+                    "centroid": (float(centroids[i][0]), float(centroids[i][1])),
+                }
+            )
 
         # Run detection
         ability_info = self.detect_ability(frame, player_index, ability_name, side)

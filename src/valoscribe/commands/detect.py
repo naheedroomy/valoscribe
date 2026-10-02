@@ -1,34 +1,37 @@
 """Detection commands for analyzing Valorant VODs."""
 
-import typer
-from typing import Optional
 from pathlib import Path
+from typing import Optional
 
 import cv2
 import numpy as np
+import typer
 
-from valoscribe.video.reader import VideoReader
+from valoscribe.detectors.ability_detector import AbilityDetector
+from valoscribe.detectors.active_round_agent_detector import ActiveRoundAgentDetector
 from valoscribe.detectors.cropper import Cropper
+from valoscribe.detectors.killfeed_detector import KillfeedDetector
+from valoscribe.detectors.preround_ability_detector import PreroundAbilityDetector
+from valoscribe.detectors.preround_credits_detector import PreroundCreditsDetector
+from valoscribe.detectors.preround_ultimate_detector import PreroundUltimateDetector
 from valoscribe.detectors.round_detector import RoundDetector
-from valoscribe.detectors.template_score_detector import TemplateScoreDetector
-from valoscribe.detectors.template_timer_detector import TemplateTimerDetector
-from valoscribe.detectors.template_spike_detector import TemplateSpikeDetector
+from valoscribe.detectors.template_agent_detector import TemplateAgentDetector
+from valoscribe.detectors.template_armor_detector import TemplateArmorDetector
 from valoscribe.detectors.template_credits_detector import TemplateCreditsDetector
 from valoscribe.detectors.template_health_detector import TemplateHealthDetector
-from valoscribe.detectors.template_armor_detector import TemplateArmorDetector
-from valoscribe.detectors.template_agent_detector import TemplateAgentDetector
-from valoscribe.detectors.active_round_agent_detector import ActiveRoundAgentDetector
-from valoscribe.detectors.preround_credits_detector import PreroundCreditsDetector
-from valoscribe.detectors.ability_detector import AbilityDetector
-from valoscribe.detectors.preround_ability_detector import PreroundAbilityDetector
+from valoscribe.detectors.template_score_detector import TemplateScoreDetector
+from valoscribe.detectors.template_spike_detector import TemplateSpikeDetector
+from valoscribe.detectors.template_timer_detector import TemplateTimerDetector
 from valoscribe.detectors.ultimate_detector import UltimateDetector
-from valoscribe.detectors.preround_ultimate_detector import PreroundUltimateDetector
-from valoscribe.detectors.killfeed_detector import KillfeedDetector
-from valoscribe.orchestration.phase_detector import PhaseDetector, Phase
-from valoscribe.utils.ocr import OCREngine
+from valoscribe.orchestration.phase_detector import Phase, PhaseDetector
+from valoscribe.types.detections import AbilityInfo, HealthInfo, UltimateInfo
 from valoscribe.utils.logger import setup_logging
+from valoscribe.utils.ocr import OCREngine
+from valoscribe.video.reader import VideoReader
 
 app = typer.Typer(help="Detection commands for analyzing Valorant VODs")
+
+
 @app.command(name="round")
 def detect_round(
     video_path: Path = typer.Argument(..., help="Path to the video file to process"),
@@ -138,9 +141,18 @@ def detect_round(
                         debug_dir.mkdir(exist_ok=True)
                         round_crop = cropper.crop_simple_region(frame_info.frame, "round_number")
                         result_text = f"round{result.round_number}" if result else "nodetection"
-                        cv2.imwrite(str(debug_dir / f"frame_{frame_count}_{result_text}_original.png"), round_crop)
+                        cv2.imwrite(
+                            str(debug_dir / f"frame_{frame_count}_{result_text}_original.png"),
+                            round_crop,
+                        )
                         if preprocessed is not None and preprocessed.size > 0:
-                            cv2.imwrite(str(debug_dir / f"frame_{frame_count}_{result_text}_preprocessed.png"), preprocessed)
+                            cv2.imwrite(
+                                str(
+                                    debug_dir
+                                    / f"frame_{frame_count}_{result_text}_preprocessed.png"
+                                ),
+                                preprocessed,
+                            )
                         typer.echo(f"  -> Saved debug images to {debug_dir}/")
                 else:
                     result = round_detector.detect(frame_info.frame)
@@ -171,7 +183,7 @@ def detect_round(
 
                     # Wait for key press
                     key = cv2.waitKey(0) & 0xFF
-                    if key == ord('q'):
+                    if key == ord("q"):
                         typer.echo("\nQuitting...")
                         break
 
@@ -198,6 +210,7 @@ def detect_round(
     finally:
         if show_debug:
             cv2.destroyAllWindows()
+
 
 @app.command(name="timer-template")
 def detect_timer_template(
@@ -448,7 +461,8 @@ def detect_spike_template(
                 else:
                     conf = spike_info.confidence if spike_info else 0.0
                     typer.secho(
-                        f"[{frame_info.timestamp_sec:7.2f}s] Spike: NOT DETECTED [conf: {conf:.2f}]",
+                        f"[{frame_info.timestamp_sec:7.2f}s] Spike: NOT DETECTED "
+                        f"[conf: {conf:.2f}]",
                         fg=typer.colors.YELLOW,
                     )
 
@@ -480,7 +494,10 @@ def detect_credits_template(
         None,
         "--template",
         "-t",
-        help="Path to dead credits template (default: src/valoscribe/templates/credits/credits_icon_dead.png)",
+        help=(
+            "Path to dead credits template (default: "
+            "src/valoscribe/templates/credits/credits_icon_dead.png)"
+        ),
     ),
     player_index: int = typer.Option(
         0,
@@ -527,7 +544,10 @@ def detect_credits_template(
         help="Wait for key press before proceeding to next frame (requires --show)",
     ),
 ) -> None:
-    """Detect dead credits icon from a Valorant VOD using template matching (high confidence = dead, low = alive)."""
+    """Detect the dead credits icon using template matching.
+
+    High confidence means dead; low confidence means alive.
+    """
     setup_logging()
 
     if not video_path.exists():
@@ -553,7 +573,8 @@ def detect_credits_template(
         # Check that template is loaded
         if credits_detector.template is None:
             typer.secho(
-                "Error: No template loaded. Please ensure dead credits template (credits_icon_dead.png) "
+                "Error: No template loaded. Please ensure dead credits template "
+                "(credits_icon_dead.png) "
                 f"is at {credits_detector.template_path}",
                 fg=typer.colors.RED,
                 err=True,
@@ -562,7 +583,7 @@ def detect_credits_template(
 
         # Determine which players to check
         if player_index == -1:
-            player_indices = range(10)
+            player_indices = list(range(10))
             typer.echo("Checking credits for all players")
         else:
             player_indices = [player_index]
@@ -626,7 +647,7 @@ def detect_credits_template(
                         player_results[p_idx] = (side, credits_info)
 
                         # credits_visible=True means dead credits icon is visible = player is DEAD
-                        # credits_visible=False means dead credits icon not visible = player is ALIVE
+                        # credits_visible=False means the player is alive.
                         if credits_info.credits_visible:
                             detection_count += 1
                             typer.secho(
@@ -660,12 +681,16 @@ def detect_credits_template(
                         side, credits_info = player_results[p_idx]
 
                         # credits_visible=True means dead credits icon visible = player is DEAD
-                        # credits_visible=False means dead credits icon not visible = player is ALIVE
+                        # credits_visible=False means the player is alive.
                         if credits_info.credits_visible:
-                            status_text = f"P{p_idx} ({side}): DEAD (conf: {credits_info.confidence:.2f})"
+                            status_text = (
+                                f"P{p_idx} ({side}): DEAD (conf: {credits_info.confidence:.2f})"
+                            )
                             color = (0, 0, 255)  # Red
                         else:
-                            status_text = f"P{p_idx} ({side}): ALIVE (conf: {credits_info.confidence:.2f})"
+                            status_text = (
+                                f"P{p_idx} ({side}): ALIVE (conf: {credits_info.confidence:.2f})"
+                            )
                             color = (0, 255, 0)  # Green
 
                         cv2.putText(
@@ -689,7 +714,7 @@ def detect_credits_template(
                         key = cv2.waitKey(1) & 0xFF
 
                     # Check for quit
-                    if key == ord('q'):
+                    if key == ord("q"):
                         typer.echo("\nQuitting...")
                         break
 
@@ -729,7 +754,10 @@ def detect_health_template(
         None,
         "--template-dir",
         "-t",
-        help="Directory containing digit templates (default: src/valoscribe/templates/health_digits/)",
+        help=(
+            "Directory containing digit templates "
+            "(default: src/valoscribe/templates/health_digits/)"
+        ),
     ),
     player_index: int = typer.Option(
         0,
@@ -811,7 +839,7 @@ def detect_health_template(
 
         # Determine which players to check
         if player_index == -1:
-            player_indices = range(10)
+            player_indices = list(range(10))
             typer.echo("Checking health for all players")
         else:
             player_indices = [player_index]
@@ -913,20 +941,23 @@ def detect_health_template(
                     for p_idx, (side, health_info) in player_results.items():
                         # Color based on health
                         if health_info.health >= 75:
-                            color = (0, 255, 0)  # Green
+                            display_color = (0, 255, 0)  # Green
                         elif health_info.health >= 40:
-                            color = (0, 255, 255)  # Yellow
+                            display_color = (0, 255, 255)  # Yellow
                         else:
-                            color = (0, 0, 255)  # Red
+                            display_color = (0, 0, 255)  # Red
 
-                        text = f"P{p_idx} ({side}): {health_info.health} HP ({health_info.confidence:.2f})"
+                        text = (
+                            f"P{p_idx} ({side}): {health_info.health} HP "
+                            f"({health_info.confidence:.2f})"
+                        )
                         cv2.putText(
                             display_frame,
                             text,
                             (20, y_offset),
                             cv2.FONT_HERSHEY_SIMPLEX,
                             0.7,
-                            color,
+                            display_color,
                             2,
                         )
                         y_offset += 30
@@ -1088,7 +1119,6 @@ def detect_armor_template(
             debug_output_dir.mkdir(parents=True, exist_ok=True)
             typer.echo(f"Debug crops will be saved to: {debug_output_dir}")
             # Clear directory
-            import shutil
             if debug_output_dir.exists():
                 for file in debug_output_dir.glob("*.png"):
                     file.unlink()
@@ -1134,7 +1164,9 @@ def detect_armor_template(
                     break
 
                 # Format timestamp
-                time = f"{int(frame_info.timestamp_sec // 60):02d}:{int(frame_info.timestamp_sec % 60):02d}"
+                minutes = int(frame_info.timestamp_sec // 60)
+                seconds = int(frame_info.timestamp_sec % 60)
+                time = f"{minutes:02d}:{seconds:02d}"
 
                 # Create display frame if showing
                 if show:
@@ -1147,8 +1179,8 @@ def detect_armor_template(
 
                     # Use debug detection if debug mode is enabled
                     if debug or debug_crops:
-                        armor_info, armor_preprocessed, debug_info = armor_detector.detect_with_debug(
-                            frame_info.frame, p_idx, side
+                        armor_info, armor_preprocessed, debug_info = (
+                            armor_detector.detect_with_debug(frame_info.frame, p_idx, side)
                         )
 
                         # Save debug crops if requested
@@ -1169,16 +1201,18 @@ def detect_armor_template(
 
                             if len(all_matches) > 0:
                                 # Show top 5 matches
-                                sorted_matches = sorted(all_matches, key=lambda m: m["confidence"], reverse=True)
-                                typer.echo(f"  Top matches:")
+                                sorted_matches = sorted(
+                                    all_matches, key=lambda m: m["confidence"], reverse=True
+                                )
+                                typer.echo("  Top matches:")
                                 for i, match in enumerate(sorted_matches[:5]):
                                     typer.echo(
-                                        f"    {i+1}. Digit '{match['digit']}' at x={match['x']} "
+                                        f"    {i + 1}. Digit '{match['digit']}' at x={match['x']} "
                                         f"conf={match['confidence']:.3f}"
                                     )
 
                                 if len(filtered_matches) > 0:
-                                    typer.echo(f"  After overlap filtering:")
+                                    typer.echo("  After overlap filtering:")
                                     for match in filtered_matches:
                                         typer.echo(
                                             f"    Digit '{match['digit']}' at x={match['x']} "
@@ -1237,7 +1271,7 @@ def detect_armor_template(
                     else:
                         key = cv2.waitKey(1) & 0xFF
 
-                    if key == ord('q'):
+                    if key == ord("q"):
                         typer.echo("\nQuitting...")
                         break
 
@@ -1277,7 +1311,10 @@ def detect_preround(
         None,
         "--template",
         "-t",
-        help="Path to pre-round credits template (default: src/valoscribe/templates/credits/credits_icon_preround.png)",
+        help=(
+            "Path to pre-round credits template (default: "
+            "src/valoscribe/templates/credits/credits_icon_preround.png)"
+        ),
     ),
     player_index: int = typer.Option(
         -1,
@@ -1315,7 +1352,10 @@ def detect_preround(
     preround_threshold: float = typer.Option(
         0.5,
         "--preround-threshold",
-        help="Fraction of players with visible credits to consider frame as pre-round (0-1, default 0.5)",
+        help=(
+            "Fraction of players with visible credits to consider frame as pre-round "
+            "(0-1, default 0.5)"
+        ),
     ),
     show: bool = typer.Option(
         False,
@@ -1357,7 +1397,8 @@ def detect_preround(
         # Check that template is loaded
         if preround_detector.template is None:
             typer.secho(
-                "Error: No template loaded. Please ensure pre-round credits template (credits_icon_preround.png) "
+                "Error: No template loaded. Please ensure pre-round credits template "
+                "(credits_icon_preround.png) "
                 f"is at {preround_detector.template_path}",
                 fg=typer.colors.RED,
                 err=True,
@@ -1366,7 +1407,7 @@ def detect_preround(
 
         # Determine which players to check
         if player_index == -1:
-            player_indices = range(10)
+            player_indices = list(range(10))
             typer.echo("Checking pre-round credits for all players")
         else:
             player_indices = [player_index]
@@ -1398,7 +1439,10 @@ def detect_preround(
             typer.echo(f"Duration: {reader.duration_sec:.2f}s")
             typer.echo(f"Template shape: {preround_detector.template.shape}")
             typer.echo(f"Min confidence: {min_confidence}")
-            typer.echo(f"Pre-round threshold: {preround_threshold} ({preround_threshold * 100:.0f}% of players)")
+            typer.echo(
+                f"Pre-round threshold: {preround_threshold} "
+                f"({preround_threshold * 100:.0f}% of players)"
+            )
 
             typer.echo("\n" + "=" * 60)
             typer.echo("DETECTING PRE-ROUND FRAMES")
@@ -1419,8 +1463,7 @@ def detect_preround(
 
                 # Check if frame is pre-round
                 is_preround = preround_detector.is_preround_frame(
-                    frame_info.frame,
-                    threshold=preround_threshold
+                    frame_info.frame, threshold=preround_threshold
                 )
 
                 if is_preround:
@@ -1449,7 +1492,8 @@ def detect_preround(
 
                 typer.secho(
                     f"[{frame_info.timestamp_sec:7.2f}s] Frame status: {frame_status} "
-                    f"({sum(1 for _, info in player_results.values() if info.credits_visible)}/{len(player_results)} visible)",
+                    f"({sum(1 for _, info in player_results.values() if info.credits_visible)}"
+                    f"/{len(player_results)} visible)",
                     fg=frame_color,
                 )
 
@@ -1460,11 +1504,13 @@ def detect_preround(
                             side, credits_info = player_results[p_idx]
                             if credits_info.credits_visible:
                                 typer.echo(
-                                    f"  Player {p_idx} ({side}): VISIBLE (conf: {credits_info.confidence:.2f})"
+                                    f"  Player {p_idx} ({side}): VISIBLE "
+                                    f"(conf: {credits_info.confidence:.2f})"
                                 )
                             else:
                                 typer.echo(
-                                    f"  Player {p_idx} ({side}): NOT VISIBLE (conf: {credits_info.confidence:.2f})"
+                                    f"  Player {p_idx} ({side}): NOT VISIBLE "
+                                    f"(conf: {credits_info.confidence:.2f})"
                                 )
 
                 # Draw detections on frame
@@ -1498,10 +1544,15 @@ def detect_preround(
                         side, credits_info = player_results[p_idx]
 
                         if credits_info.credits_visible:
-                            status_text = f"P{p_idx} ({side}): VISIBLE (conf: {credits_info.confidence:.2f})"
+                            status_text = (
+                                f"P{p_idx} ({side}): VISIBLE (conf: {credits_info.confidence:.2f})"
+                            )
                             color = (0, 255, 0)  # Green
                         else:
-                            status_text = f"P{p_idx} ({side}): NOT VISIBLE (conf: {credits_info.confidence:.2f})"
+                            status_text = (
+                                f"P{p_idx} ({side}): NOT VISIBLE "
+                                f"(conf: {credits_info.confidence:.2f})"
+                            )
                             color = (128, 128, 128)  # Gray
 
                         cv2.putText(
@@ -1525,7 +1576,7 @@ def detect_preround(
                         key = cv2.waitKey(1) & 0xFF
 
                     # Check for quit
-                    if key == ord('q'):
+                    if key == ord("q"):
                         typer.echo("\nQuitting...")
                         break
 
@@ -1541,7 +1592,12 @@ def detect_preround(
             typer.echo("=" * 60)
             total_checks = frame_count * len(player_indices)
             typer.echo(f"Frames processed: {frame_count}")
-            typer.echo(f"Pre-round frames detected: {preround_frame_count} ({preround_frame_count / frame_count * 100:.1f}%)" if frame_count > 0 else "Pre-round frames detected: 0")
+            typer.echo(
+                f"Pre-round frames detected: {preround_frame_count} "
+                f"({preround_frame_count / frame_count * 100:.1f}%)"
+                if frame_count > 0
+                else "Pre-round frames detected: 0"
+            )
             typer.echo(f"Players checked per frame: {len(player_indices)}")
             typer.echo(f"Total checks: {total_checks}")
             typer.echo(f"Visible credits detections: {detection_count}")
@@ -1566,7 +1622,10 @@ def detect_agents_preround(
         None,
         "--template-dir",
         "-t",
-        help="Directory containing agent templates (default: src/valoscribe/templates/preround_agents/)",
+        help=(
+            "Directory containing agent templates "
+            "(default: src/valoscribe/templates/preround_agents/)"
+        ),
     ),
     player_index: int = typer.Option(
         0,
@@ -1654,7 +1713,7 @@ def detect_agents_preround(
 
         # Determine which players to check
         if player_index == -1:
-            player_indices = range(10)
+            player_indices = list(range(10))
             typer.echo("Checking agents for all players")
         else:
             player_indices = [player_index]
@@ -1735,8 +1794,7 @@ def detect_agents_preround(
                         )
                     else:
                         typer.secho(
-                            f"[{frame_info.timestamp_sec:7.2f}s] Player {p_idx}: "
-                            f"NO DETECTION",
+                            f"[{frame_info.timestamp_sec:7.2f}s] Player {p_idx}: NO DETECTION",
                             fg=typer.colors.YELLOW,
                         )
 
@@ -1745,19 +1803,28 @@ def detect_agents_preround(
                         if not debug_info or not debug_info.get("match_scores"):
                             typer.secho(
                                 f"\n  Debug - Player {p_idx}: No template matching performed",
-                                fg=typer.colors.MAGENTA
+                                fg=typer.colors.MAGENTA,
                             )
 
                             # Show diagnostic info
                             if debug_info:
                                 if debug_info.get("error"):
-                                    typer.secho(f"    Error: {debug_info['error']}", fg=typer.colors.RED)
+                                    typer.secho(
+                                        f"    Error: {debug_info['error']}", fg=typer.colors.RED
+                                    )
                                 if "num_preround_crops" in debug_info:
-                                    typer.echo(f"    Preround crops returned: {debug_info['num_preround_crops']}")
+                                    typer.echo(
+                                        "    Preround crops returned: "
+                                        f"{debug_info['num_preround_crops']}"
+                                    )
                                 if "crop_keys" in debug_info:
-                                    typer.echo(f"    Crop keys available: {debug_info['crop_keys']}")
+                                    typer.echo(
+                                        f"    Crop keys available: {debug_info['crop_keys']}"
+                                    )
                                 if "agent_crop_shape" in debug_info:
-                                    typer.echo(f"    Agent crop shape: {debug_info['agent_crop_shape']}")
+                                    typer.echo(
+                                        f"    Agent crop shape: {debug_info['agent_crop_shape']}"
+                                    )
                         else:
                             typer.echo(f"\n  Debug - Template match scores for Player {p_idx}:")
 
@@ -1766,7 +1833,7 @@ def detect_agents_preround(
                             sorted_matches = sorted(
                                 match_scores.items(),
                                 key=lambda x: x[1].get("confidence", 0.0),
-                                reverse=True
+                                reverse=True,
                             )
 
                             typer.echo(f"  Total templates: {len(match_scores)}")
@@ -1779,8 +1846,9 @@ def detect_agents_preround(
 
                                 if "skipped" in score_data:
                                     typer.secho(
-                                        f"    {i+1:2d}. {agent:12s} ({side:7s}): SKIPPED - {score_data['skipped']}",
-                                        fg=typer.colors.CYAN
+                                        f"    {i + 1:2d}. {agent:12s} ({side:7s}): "
+                                        f"SKIPPED - {score_data['skipped']}",
+                                        fg=typer.colors.CYAN,
                                     )
                                 else:
                                     loc = score_data.get("location", (0, 0))
@@ -1793,8 +1861,9 @@ def detect_agents_preround(
                                         color = typer.colors.WHITE
 
                                     typer.secho(
-                                        f"    {i+1:2d}. {agent:12s} ({side:7s}): {conf:.4f} at {loc}",
-                                        fg=color
+                                        f"    {i + 1:2d}. {agent:12s} ({side:7s}): "
+                                        f"{conf:.4f} at {loc}",
+                                        fg=color,
                                     )
 
                         typer.echo("")  # Blank line after debug output
@@ -1817,18 +1886,21 @@ def detect_agents_preround(
                     for p_idx, agent_info in player_results.items():
                         # Color based on side
                         if agent_info.side == "attack":
-                            color = (0, 0, 255)  # Red
+                            display_color = (0, 0, 255)  # Red
                         else:  # defense
-                            color = (0, 255, 0)  # Green
+                            display_color = (0, 255, 0)  # Green
 
-                        text = f"P{p_idx}: {agent_info.agent_name} ({agent_info.side}) [{agent_info.confidence:.2f}]"
+                        text = (
+                            f"P{p_idx}: {agent_info.agent_name} ({agent_info.side}) "
+                            f"[{agent_info.confidence:.2f}]"
+                        )
                         cv2.putText(
                             display_frame,
                             text,
                             (20, y_offset),
                             cv2.FONT_HERSHEY_SIMPLEX,
                             0.7,
-                            color,
+                            display_color,
                             2,
                         )
                         y_offset += 30
@@ -1924,7 +1996,6 @@ def detect_abilities_preround(
     ),
 ) -> None:
     """Detect pre-round ability charges from a Valorant VOD using blob detection."""
-    from valoscribe.detectors.preround_ability_detector import PreroundAbilityDetector
 
     setup_logging()
 
@@ -1995,7 +2066,7 @@ def detect_abilities_preround(
 
                 # Determine which players to detect
                 if player_index == -1:
-                    player_indices = range(10)  # All players
+                    player_indices = list(range(10))  # All players
                 else:
                     player_indices = [player_index]
 
@@ -2022,9 +2093,7 @@ def detect_abilities_preround(
                     ability_strs = []
                     for ability_name, ability_info in abilities.items():
                         if ability_info:
-                            ability_strs.append(
-                                f"{ability_name}: {ability_info.charges} charges"
-                            )
+                            ability_strs.append(f"{ability_name}: {ability_info.charges} charges")
 
                     if ability_strs:
                         typer.secho(
@@ -2136,7 +2205,7 @@ def detect_abilities_preround(
                         key = cv2.waitKey(1) & 0xFF
 
                     # Check for quit
-                    if key == ord('q'):
+                    if key == ord("q"):
                         typer.echo("\nQuitting...")
                         break
 
@@ -2217,7 +2286,6 @@ def detect_ultimates_preround(
     ),
 ) -> None:
     """Detect pre-round ultimate charges from a Valorant VOD using blob detection."""
-    from valoscribe.detectors.preround_ultimate_detector import PreroundUltimateDetector
 
     setup_logging()
 
@@ -2290,12 +2358,12 @@ def detect_ultimates_preround(
 
                 # Determine which players to detect
                 if player_index == -1:
-                    player_indices = range(10)  # All players
+                    player_indices = list(range(10))  # All players
                 else:
                     player_indices = [player_index]
 
                 # Collect all detections for display
-                all_detections = {}
+                all_detections: dict[int, tuple[str, UltimateInfo | None, float]] = {}
 
                 # Detect ultimates for each player
                 for p_idx in player_indices:
@@ -2303,9 +2371,7 @@ def detect_ultimates_preround(
                     side = "left" if p_idx < 5 else "right"
 
                     # Detect ultimate
-                    result = ultimate_detector.detect_ultimate(
-                        frame_info.frame, p_idx, side
-                    )
+                    result = ultimate_detector.detect_ultimate(frame_info.frame, p_idx, side)
 
                     if result:
                         ultimate_info, white_pixel_ratio = result
@@ -2314,7 +2380,9 @@ def detect_ultimates_preround(
                         all_detections[p_idx] = (side, ultimate_info, white_pixel_ratio)
 
                         # Display results
-                        status = "FULL" if ultimate_info.is_full else f"{ultimate_info.charges} charges"
+                        status = (
+                            "FULL" if ultimate_info.is_full else f"{ultimate_info.charges} charges"
+                        )
                         typer.secho(
                             f"[{frame_info.timestamp_sec:7.2f}s] Player {p_idx} ({side}): "
                             f"{status} (white ratio: {white_pixel_ratio:.2f})",
@@ -2341,7 +2409,7 @@ def detect_ultimates_preround(
                     thickness = 2
 
                     for p_idx in sorted(all_detections.keys()):
-                        side, ultimate_info, white_pixel_ratio = all_detections[p_idx]
+                        side, displayed_ultimate, white_pixel_ratio = all_detections[p_idx]
 
                         # Draw player prefix in green
                         prefix = f"P{p_idx} ({side}): "
@@ -2360,12 +2428,15 @@ def detect_ultimates_preround(
                         (prefix_width, _), _ = cv2.getTextSize(prefix, font, font_scale, thickness)
                         x_offset += prefix_width
 
+                        if displayed_ultimate is None:
+                            continue
+
                         # Draw ultimate status in yellow (full) or blue (partial)
-                        if ultimate_info.is_full:
-                            ult_text = f"FULL ({ultimate_info.charges})"
+                        if displayed_ultimate.is_full:
+                            ult_text = f"FULL ({displayed_ultimate.charges})"
                             color = (0, 255, 255)  # Yellow
                         else:
-                            ult_text = f"{ultimate_info.charges} charges"
+                            ult_text = f"{displayed_ultimate.charges} charges"
                             color = (255, 0, 0)  # Blue
 
                         cv2.putText(
@@ -2390,7 +2461,7 @@ def detect_ultimates_preround(
                         key = cv2.waitKey(1) & 0xFF
 
                     # Check for quit
-                    if key == ord('q'):
+                    if key == ord("q"):
                         typer.echo("\nQuitting...")
                         break
 
@@ -2556,7 +2627,10 @@ def detect_game_state(
                 if timer_info:
                     # Readable game frame - timer visible
                     timer_count += 1
-                    state_text = f"Timer: {timer_info.time_seconds:.2f}s ({timer_info.raw_text}) [conf: {timer_info.confidence:.2f}]"
+                    state_text = (
+                        f"Timer: {timer_info.time_seconds:.2f}s ({timer_info.raw_text}) "
+                        f"[conf: {timer_info.confidence:.2f}]"
+                    )
                     state_color = (0, 255, 0)  # Green
                     typer.secho(
                         f"[{frame_info.timestamp_sec:7.2f}s] {state_text}",
@@ -2613,7 +2687,7 @@ def detect_game_state(
 
                     # Wait 1ms and check for 'q' key
                     key = cv2.waitKey(1) & 0xFF
-                    if key == ord('q'):
+                    if key == ord("q"):
                         typer.echo("\nUser quit (pressed 'q')")
                         break
 
@@ -2630,8 +2704,13 @@ def detect_game_state(
             typer.echo(f"Frames processed: {frame_count}")
             typer.echo(f"Timer frames: {timer_count} ({timer_count / frame_count * 100:.1f}%)")
             typer.echo(f"Spike frames: {spike_count} ({spike_count / frame_count * 100:.1f}%)")
-            typer.echo(f"Non-game frames: {non_game_count} ({non_game_count / frame_count * 100:.1f}%)")
-            typer.echo(f"Total game frames: {timer_count + spike_count} ({(timer_count + spike_count) / frame_count * 100:.1f}%)")
+            typer.echo(
+                f"Non-game frames: {non_game_count} ({non_game_count / frame_count * 100:.1f}%)"
+            )
+            typer.echo(
+                f"Total game frames: {timer_count + spike_count} "
+                f"({(timer_count + spike_count) / frame_count * 100:.1f}%)"
+            )
 
     except Exception as e:
         typer.secho(f"\nError: {e}", fg=typer.colors.RED, err=True)
@@ -2775,7 +2854,7 @@ def detect_score_template(
 
                 # Show unique scores detected
                 unique_scores = sorted(set((d.team1_score, d.team2_score) for d in detections))
-                typer.echo(f"Unique scores detected:")
+                typer.echo("Unique scores detected:")
                 for team1, team2 in unique_scores:
                     typer.echo(f"  {team1} - {team2}")
 
@@ -2908,7 +2987,7 @@ def detect_abilities(
 
                 # Determine which players to detect
                 if player_index == -1:
-                    player_indices = range(10)  # All players
+                    player_indices = list(range(10))  # All players
                 else:
                     player_indices = [player_index]
 
@@ -2935,9 +3014,7 @@ def detect_abilities(
                     ability_strs = []
                     for ability_name, ability_info in abilities.items():
                         if ability_info:
-                            ability_strs.append(
-                                f"{ability_name}: {ability_info.charges} charges"
-                            )
+                            ability_strs.append(f"{ability_name}: {ability_info.charges} charges")
 
                     if ability_strs:
                         typer.secho(
@@ -3012,7 +3089,9 @@ def detect_abilities(
                                     (0, 255, 0),  # Green
                                     thickness,
                                 )
-                                (sep_width, _), _ = cv2.getTextSize(separator, font, font_scale, thickness)
+                                (sep_width, _), _ = cv2.getTextSize(
+                                    separator, font, font_scale, thickness
+                                )
                                 x_offset += sep_width
 
                             # Draw ability label in green
@@ -3026,7 +3105,9 @@ def detect_abilities(
                                 (0, 255, 0),  # Green
                                 thickness,
                             )
-                            (label_width, _), _ = cv2.getTextSize(label, font, font_scale, thickness)
+                            (label_width, _), _ = cv2.getTextSize(
+                                label, font, font_scale, thickness
+                            )
                             x_offset += label_width
 
                             # Draw count in red
@@ -3040,7 +3121,9 @@ def detect_abilities(
                                 (0, 0, 255),  # Red
                                 thickness,
                             )
-                            (count_width, _), _ = cv2.getTextSize(count, font, font_scale, thickness)
+                            (count_width, _), _ = cv2.getTextSize(
+                                count, font, font_scale, thickness
+                            )
                             x_offset += count_width
 
                         y_offset += 35
@@ -3055,7 +3138,7 @@ def detect_abilities(
                         key = cv2.waitKey(1) & 0xFF
 
                     # Check for quit
-                    if key == ord('q'):
+                    if key == ord("q"):
                         typer.echo("\nQuitting...")
                         break
 
@@ -3140,7 +3223,10 @@ def detect_abilities_live(
         help="Wait for key press before proceeding to next frame (requires --show)",
     ),
 ) -> None:
-    """Detect health, abilities, and ultimates for alive players (using health as alive/dead indicator)."""
+    """Detect player health, abilities, and ultimates.
+
+    Health detection is used as the alive/dead indicator.
+    """
     setup_logging()
 
     if not video_path.exists():
@@ -3202,7 +3288,10 @@ def detect_abilities_live(
             if player_index == -1:
                 typer.echo("Detecting health, abilities, and ultimates for all alive players")
             else:
-                typer.echo(f"Detecting health, abilities, and ultimates for player {player_index} (if alive)")
+                typer.echo(
+                    f"Detecting health, abilities, and ultimates for player {player_index} "
+                    "(if alive)"
+                )
 
             if show:
                 typer.echo("Display mode: ON")
@@ -3234,12 +3323,21 @@ def detect_abilities_live(
 
                 # Determine which players to detect
                 if player_index == -1:
-                    player_indices = range(10)  # All players
+                    player_indices = list(range(10))  # All players
                 else:
                     player_indices = [player_index]
 
                 # Collect all detections for display
-                all_detections = {}
+                all_detections: dict[
+                    int,
+                    tuple[
+                        str,
+                        HealthInfo | None,
+                        dict[str, AbilityInfo | None] | None,
+                        UltimateInfo | None,
+                        HealthInfo | None,
+                    ],
+                ] = {}
 
                 # Detect health, abilities, and ultimates for each player
                 for p_idx in player_indices:
@@ -3253,7 +3351,8 @@ def detect_abilities_live(
                         # No health detected = player is dead
                         all_detections[p_idx] = (side, None, None, None, None)
                         typer.secho(
-                            f"[{frame_info.timestamp_sec:7.2f}s] Player {p_idx} ({side}): DEAD (no health detected)",
+                            f"[{frame_info.timestamp_sec:7.2f}s] Player {p_idx} ({side}): "
+                            "DEAD (no health detected)",
                             fg=typer.colors.RED,
                         )
                     else:
@@ -3262,13 +3361,21 @@ def detect_abilities_live(
                             frame_info.frame, p_idx, side
                         )
 
-                        ultimate_result = ultimate_detector.detect_ultimate(frame_info.frame, p_idx, side)
+                        ultimate_result = ultimate_detector.detect_ultimate(
+                            frame_info.frame, p_idx, side
+                        )
 
-                        # Unpack ultimate result (returns tuple of (UltimateInfo, white_pixel_ratio))
+                        # Unpack the ultimate and its white-pixel ratio.
                         ultimate_info = ultimate_result[0] if ultimate_result else None
 
                         # Store detections
-                        all_detections[p_idx] = (side, health_info, abilities, ultimate_info, health_info)
+                        all_detections[p_idx] = (
+                            side,
+                            health_info,
+                            abilities,
+                            ultimate_info,
+                            health_info,
+                        )
 
                         # Build output strings
                         output_parts = [f"HP: {health_info.health}"]
@@ -3277,9 +3384,7 @@ def detect_abilities_live(
                         ability_strs = []
                         for ability_name, ability_info in abilities.items():
                             if ability_info:
-                                ability_strs.append(
-                                    f"{ability_name}: {ability_info.charges}"
-                                )
+                                ability_strs.append(f"{ability_name}: {ability_info.charges}")
 
                         if ability_strs:
                             output_parts.extend(ability_strs)
@@ -3287,14 +3392,14 @@ def detect_abilities_live(
                         # Add ultimate
                         if ultimate_info:
                             if ultimate_info.is_full:
-                                output_parts.append(f"Ult: READY")
+                                output_parts.append("Ult: READY")
                             else:
                                 output_parts.append(f"Ult: {ultimate_info.charges}")
 
                         typer.secho(
                             f"[{frame_info.timestamp_sec:7.2f}s] Player {p_idx} ({side}): ALIVE | "
-                            + " | ".join(output_parts) +
-                            f" (health conf: {health_info.confidence:.2f})",
+                            + " | ".join(output_parts)
+                            + f" (health conf: {health_info.confidence:.2f})",
                             fg=typer.colors.GREEN,
                         )
 
@@ -3318,7 +3423,9 @@ def detect_abilities_live(
                     thickness = 2
 
                     for p_idx in sorted(all_detections.keys()):
-                        side, health_info, abilities, ultimate_info, _ = all_detections[p_idx]
+                        side, health_info, detected_abilities, ultimate_info, _ = all_detections[
+                            p_idx
+                        ]
 
                         if health_info is None:
                             # Dead player - show in gray
@@ -3349,12 +3456,14 @@ def detect_abilities_live(
                             )
 
                             # Calculate width of prefix text
-                            (prefix_width, _), _ = cv2.getTextSize(prefix, font, font_scale, thickness)
+                            (prefix_width, _), _ = cv2.getTextSize(
+                                prefix, font, font_scale, thickness
+                            )
                             x_offset += prefix_width
 
                             # Draw each ability with label in green, count in red
                             ability_data = []
-                            for ability_name, ability_info in abilities.items():
+                            for ability_name, ability_info in (detected_abilities or {}).items():
                                 if ability_info:
                                     ability_data.append((ability_name[-1], ability_info.charges))
 
@@ -3371,7 +3480,9 @@ def detect_abilities_live(
                                         (0, 255, 0),  # Green
                                         thickness,
                                     )
-                                    (sep_width, _), _ = cv2.getTextSize(separator, font, font_scale, thickness)
+                                    (sep_width, _), _ = cv2.getTextSize(
+                                        separator, font, font_scale, thickness
+                                    )
                                     x_offset += sep_width
 
                                 # Draw ability label in green
@@ -3385,7 +3496,9 @@ def detect_abilities_live(
                                     (0, 255, 0),  # Green
                                     thickness,
                                 )
-                                (label_width, _), _ = cv2.getTextSize(label, font, font_scale, thickness)
+                                (label_width, _), _ = cv2.getTextSize(
+                                    label, font, font_scale, thickness
+                                )
                                 x_offset += label_width
 
                                 # Draw count in red
@@ -3399,7 +3512,9 @@ def detect_abilities_live(
                                     (0, 0, 255),  # Red
                                     thickness,
                                 )
-                                (count_width, _), _ = cv2.getTextSize(count, font, font_scale, thickness)
+                                (count_width, _), _ = cv2.getTextSize(
+                                    count, font, font_scale, thickness
+                                )
                                 x_offset += count_width
 
                             # Add ultimate status
@@ -3414,7 +3529,9 @@ def detect_abilities_live(
                                     (0, 255, 0),  # Green
                                     thickness,
                                 )
-                                (sep_width, _), _ = cv2.getTextSize(separator, font, font_scale, thickness)
+                                (sep_width, _), _ = cv2.getTextSize(
+                                    separator, font, font_scale, thickness
+                                )
                                 x_offset += sep_width
 
                                 if ultimate_info.is_full:
@@ -3446,7 +3563,7 @@ def detect_abilities_live(
                         key = cv2.waitKey(1) & 0xFF
 
                     # Check for quit
-                    if key == ord('q'):
+                    if key == ord("q"):
                         typer.echo("\nQuitting...")
                         break
 
@@ -3595,7 +3712,6 @@ def detect_ultimates(
             if debug_crops:
                 debug_output_dir.mkdir(parents=True, exist_ok=True)
                 typer.echo(f"Debug crops will be saved to: {debug_output_dir}")
-                import shutil
                 # Clear directory
                 if debug_output_dir.exists():
                     for file in debug_output_dir.glob("*.png"):
@@ -3618,12 +3734,12 @@ def detect_ultimates(
 
                 # Determine which players to detect
                 if player_index == -1:
-                    player_indices = range(10)  # All players
+                    player_indices = list(range(10))  # All players
                 else:
                     player_indices = [player_index]
 
                 # Collect all detections for display
-                all_detections = {}
+                all_detections: dict[int, tuple[str, UltimateInfo | None, float]] = {}
 
                 # Detect ultimates for each player
                 for p_idx in player_indices:
@@ -3632,8 +3748,8 @@ def detect_ultimates(
 
                     # Use debug detection if debug_crops is enabled
                     if debug_crops:
-                        ultimate_info, preprocessed, debug_info = ultimate_detector.detect_with_debug(
-                            frame_info.frame, p_idx, side
+                        ultimate_info, preprocessed, debug_info = (
+                            ultimate_detector.detect_with_debug(frame_info.frame, p_idx, side)
                         )
 
                         # Get white pixel ratio from debug info
@@ -3654,9 +3770,7 @@ def detect_ultimates(
                         result = (ultimate_info, white_pixel_ratio) if ultimate_info else None
                     else:
                         # Normal detection
-                        result = ultimate_detector.detect_ultimate(
-                            frame_info.frame, p_idx, side
-                        )
+                        result = ultimate_detector.detect_ultimate(frame_info.frame, p_idx, side)
 
                     # Unpack result
                     if result is None:
@@ -3672,14 +3786,16 @@ def detect_ultimates(
                     if ultimate_info.is_full:
                         typer.secho(
                             f"[{frame_info.timestamp_sec:7.2f}s] Player {p_idx} ({side}): "
-                            f"FULL ({ultimate_info.charges} charges) [fullness: {white_pixel_ratio:.3f}]",
+                            f"FULL ({ultimate_info.charges} charges) "
+                            f"[fullness: {white_pixel_ratio:.3f}]",
                             fg=typer.colors.CYAN,
                         )
                     else:
                         typer.secho(
                             f"[{frame_info.timestamp_sec:7.2f}s] Player {p_idx} ({side}): "
                             f"{ultimate_info.charges} charges "
-                            f"[fullness: {white_pixel_ratio:.3f}, blobs: {ultimate_info.total_blobs_detected}]",
+                            f"[fullness: {white_pixel_ratio:.3f}, "
+                            f"blobs: {ultimate_info.total_blobs_detected}]",
                             fg=typer.colors.GREEN,
                         )
 
@@ -3703,18 +3819,24 @@ def detect_ultimates(
                     thickness = 2
 
                     for p_idx in sorted(all_detections.keys()):
-                        side, ultimate_info, white_pixel_ratio = all_detections[p_idx]
+                        side, displayed_ultimate, white_pixel_ratio = all_detections[p_idx]
 
-                        if ultimate_info is None:
+                        if displayed_ultimate is None:
                             continue
 
-                        if ultimate_info.is_full:
+                        if displayed_ultimate.is_full:
                             # Full ultimate - cyan
-                            text = f"P{p_idx} ({side}): FULL ({ultimate_info.charges} charges) [{white_pixel_ratio:.3f}]"
+                            text = (
+                                f"P{p_idx} ({side}): FULL ({displayed_ultimate.charges} charges) "
+                                f"[{white_pixel_ratio:.3f}]"
+                            )
                             color = (255, 255, 0)  # Cyan
                         else:
                             # Partial ultimate - green
-                            text = f"P{p_idx} ({side}): {ultimate_info.charges} charges [{white_pixel_ratio:.3f}]"
+                            text = (
+                                f"P{p_idx} ({side}): {displayed_ultimate.charges} charges "
+                                f"[{white_pixel_ratio:.3f}]"
+                            )
                             color = (0, 255, 0)  # Green
 
                         cv2.putText(
@@ -3738,7 +3860,7 @@ def detect_ultimates(
                         key = cv2.waitKey(1) & 0xFF
 
                     # Check for quit
-                    if key == ord('q'):
+                    if key == ord("q"):
                         typer.echo("\nQuitting...")
                         break
 
@@ -3810,7 +3932,10 @@ def detect_killfeed(
         None,
         "--agents",
         "-a",
-        help="Comma-separated list of agent names to match (e.g., 'jett,raze,cypher'). If not provided, matches all agents.",
+        help=(
+            "Comma-separated agent names to match (e.g., 'jett,raze,cypher'). "
+            "If omitted, matches all agents."
+        ),
     ),
     full_frame: bool = typer.Option(
         False,
@@ -3910,12 +4035,14 @@ def detect_killfeed(
                 detections = killfeed_detector.detect(frame_info.frame)
 
                 # Format timestamp
-                time = f"{int(frame_info.timestamp_sec // 60):02d}:{int(frame_info.timestamp_sec % 60):02d}"
+                minutes = int(frame_info.timestamp_sec // 60)
+                seconds = int(frame_info.timestamp_sec % 60)
+                time = f"{minutes:02d}:{seconds:02d}"
 
                 if len(detections) == 0:
                     typer.secho(f"[{time}] No kills detected", fg=typer.colors.WHITE, dim=True)
                 else:
-                    for entry_idx, detection in enumerate(detections):
+                    for entry_idx, detection in detections:
                         if detection:
                             # Format: "atk agent_name killed def agent_name"
                             kill_msg = (
@@ -3932,7 +4059,8 @@ def detect_killfeed(
                                 color = typer.colors.WHITE
 
                             typer.secho(
-                                f"[{time}] Entry {entry_idx}: {kill_msg} (conf: {detection.confidence:.2f})",
+                                f"[{time}] Entry {entry_idx}: {kill_msg} "
+                                f"(conf: {detection.confidence:.2f})",
                                 fg=color,
                             )
                             total_kills += 1
@@ -3940,7 +4068,7 @@ def detect_killfeed(
                 # Display mode
                 if show:
                     if full_frame:
-                        # Show full frame with detection text overlay (always, even if no detections)
+                        # Show the full frame, even if there are no detections.
                         display_frame = frame_info.frame.copy()
 
                         # Add detection text to frame
@@ -3950,10 +4078,11 @@ def detect_killfeed(
                         thickness = 2
 
                         if len(detections) > 0:
-                            for entry_idx, detection in enumerate(detections):
+                            for entry_idx, detection in detections:
                                 if detection:
                                     kill_text = (
-                                        f"Entry {entry_idx}: {detection.killer_side[:3]} {detection.killer_agent} -> "
+                                        f"Entry {entry_idx}: {detection.killer_side[:3]} "
+                                        f"{detection.killer_agent} -> "
                                         f"{detection.victim_side[:3]} {detection.victim_agent} "
                                         f"(conf: {detection.confidence:.2f})"
                                     )
@@ -3997,7 +4126,7 @@ def detect_killfeed(
                             key = cv2.waitKey(1) & 0xFF
 
                         # Check for quit
-                        if key == ord('q'):
+                        if key == ord("q"):
                             typer.echo("\nQuitting...")
                             break
 
@@ -4005,19 +4134,23 @@ def detect_killfeed(
                         # Show individual killfeed crops (only when there are detections)
                         killfeed_entries = cropper.crop_killfeed(frame_info.frame)
 
-                        for entry_idx, detection in enumerate(detections):
+                        for entry_idx, detection in detections:
                             if detection and entry_idx < len(killfeed_entries):
                                 entry_crop = killfeed_entries[entry_idx]
 
                                 # Display entry crop
-                                display_crop = cv2.resize(entry_crop, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+                                display_crop = cv2.resize(
+                                    entry_crop, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC
+                                )
 
                                 # Add label
                                 kill_text = (
                                     f"{detection.killer_side[:3]} {detection.killer_agent} -> "
                                     f"{detection.victim_side[:3]} {detection.victim_agent}"
                                 )
-                                label_img = 255 * np.ones((40, display_crop.shape[1], 3), dtype=np.uint8)
+                                label_img = 255 * np.ones(
+                                    (40, display_crop.shape[1], 3), dtype=np.uint8
+                                )
                                 cv2.putText(
                                     label_img,
                                     kill_text,
@@ -4040,7 +4173,7 @@ def detect_killfeed(
                             key = cv2.waitKey(1) & 0xFF
 
                         # Check for quit
-                        if key == ord('q'):
+                        if key == ord("q"):
                             typer.echo("\nQuitting...")
                             break
 
@@ -4173,7 +4306,10 @@ def detect_phase(
             end_time_sec=end_time,
         ) as reader:
             typer.echo("=" * 80)
-            typer.echo(f"{'Frame':<8} {'Time':<10} {'Phase':<15} {'Timer':<10} {'Spike':<8} {'Score':<10} {'Credits':<10}")
+            typer.echo(
+                f"{'Frame':<8} {'Time':<10} {'Phase':<15} {'Timer':<10} "
+                f"{'Spike':<8} {'Score':<10} {'Credits':<10}"
+            )
             typer.echo("=" * 80)
 
             for frame_info in reader:
@@ -4193,12 +4329,14 @@ def detect_phase(
 
                 # Track phase changes
                 if detected_phase != current_phase:
-                    phase_changes.append({
-                        "frame": frame_count,
-                        "timestamp": timestamp,
-                        "old_phase": current_phase,
-                        "new_phase": detected_phase,
-                    })
+                    phase_changes.append(
+                        {
+                            "frame": frame_count,
+                            "timestamp": timestamp,
+                            "old_phase": current_phase,
+                            "new_phase": detected_phase,
+                        }
+                    )
                     current_phase = detected_phase
 
                 # Track phase counts
@@ -4206,21 +4344,17 @@ def detect_phase(
 
                 # Format detection results
                 timer_str = (
-                    f"{detections['timer'].time_seconds:.1f}s"
-                    if detections['timer']
-                    else "N/A"
+                    f"{detections['timer'].time_seconds:.1f}s" if detections["timer"] else "N/A"
                 )
                 spike_str = (
-                    "YES" if detections['spike'] and detections['spike'].spike_planted else "NO"
+                    "YES" if detections["spike"] and detections["spike"].spike_planted else "NO"
                 )
                 score_str = (
                     f"{detections['score'].team1_score}-{detections['score'].team2_score}"
-                    if detections['score']
+                    if detections["score"]
                     else "N/A"
                 )
-                credits_str = (
-                    "YES" if detections['preround_credits'] else "NO"
-                )
+                credits_str = "YES" if detections["preround_credits"] else "NO"
 
                 # Print frame result
                 typer.echo(
@@ -4244,7 +4378,7 @@ def detect_phase(
                     # Add phase with background box for visibility
                     phase_color = {
                         Phase.NON_GAME: (128, 128, 128),  # Gray
-                        Phase.PREROUND: (0, 255, 255),    # Yellow
+                        Phase.PREROUND: (0, 255, 255),  # Yellow
                         Phase.ACTIVE_ROUND: (0, 255, 0),  # Green
                         Phase.POST_ROUND: (0, 165, 255),  # Orange
                     }
@@ -4302,7 +4436,7 @@ def detect_phase(
                         key = cv2.waitKey(1) & 0xFF
 
                     # Check for quit
-                    if key == ord('q'):
+                    if key == ord("q"):
                         typer.echo("\nQuitting...")
                         break
 
@@ -4317,7 +4451,7 @@ def detect_phase(
             typer.echo("SUMMARY")
             typer.echo("=" * 80)
             typer.echo(f"Frames processed: {frame_count}")
-            typer.echo(f"\nPhase distribution:")
+            typer.echo("\nPhase distribution:")
             for phase, count in phase_counts.items():
                 percentage = (count / frame_count * 100) if frame_count > 0 else 0
                 typer.echo(f"  {phase.name:<15}: {count:>4} frames ({percentage:>5.1f}%)")
@@ -4333,6 +4467,7 @@ def detect_phase(
     except Exception as e:
         typer.secho(f"\nError: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
+
 
 @app.command(name="agents-active")
 def detect_agents_active(
@@ -4353,7 +4488,10 @@ def detect_agents_active(
         None,
         "--template-dir",
         "-t",
-        help="Directory containing agent templates (default: src/valoscribe/templates/active_round_agents/)",
+        help=(
+            "Directory containing agent templates "
+            "(default: src/valoscribe/templates/active_round_agents/)"
+        ),
     ),
     min_confidence: float = typer.Option(
         0.7,
@@ -4455,7 +4593,11 @@ def detect_agents_active(
                             if "skipped" in score_data:
                                 typer.echo(f"    {agent:30s} - SKIPPED")
                             else:
-                                color_code = typer.colors.GREEN if confidence >= min_confidence else typer.colors.WHITE
+                                color_code = (
+                                    typer.colors.GREEN
+                                    if confidence >= min_confidence
+                                    else typer.colors.WHITE
+                                )
                                 typer.secho(
                                     f"    {agent:30s} - {confidence:.3f}",
                                     fg=color_code,
@@ -4463,9 +4605,11 @@ def detect_agents_active(
 
                 if agent_name:
                     side_label = "LEFT" if p_idx < 5 else "RIGHT"
-                    typer.secho(f"  ✓ Detected: {agent_name} (screen: {side_label})", fg=typer.colors.GREEN)
+                    typer.secho(
+                        f"  ✓ Detected: {agent_name} (screen: {side_label})", fg=typer.colors.GREEN
+                    )
                 else:
-                    typer.secho(f"  ✗ No agent detected", fg=typer.colors.YELLOW)
+                    typer.secho("  ✗ No agent detected", fg=typer.colors.YELLOW)
 
                 typer.echo("")
             else:
@@ -4484,6 +4628,7 @@ def detect_agents_active(
         typer.secho(f"\nError: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
 
+
 @app.command(name="agents-active-vod")
 def detect_agents_active_vod(
     video_path: Path = typer.Argument(..., help="Path to the video file to process"),
@@ -4497,7 +4642,10 @@ def detect_agents_active_vod(
         None,
         "--template-dir",
         "-t",
-        help="Directory containing agent templates (default: src/valoscribe/templates/active_round_agents/)",
+        help=(
+            "Directory containing agent templates "
+            "(default: src/valoscribe/templates/active_round_agents/)"
+        ),
     ),
     min_confidence: float = typer.Option(
         0.7,
@@ -4529,14 +4677,14 @@ def detect_agents_active_vod(
     show_all: bool = typer.Option(
         False,
         "--show-all",
-        help="Show detection results for every frame (default: only show when all 10 agents detected)",
+        help=("Show results for every frame (default: only when all 10 agents are detected)"),
     ),
 ) -> None:
     """Detect agents from active round VOD frames.
-    
+
     Processes video frames and detects agent icons. By default, only prints results
     when all 10 agents are successfully detected. Use --show-all to see every frame.
-    
+
     Example:
         valoscribe detect agents-active-vod video.mp4 --fps 1 --start 60
     """
@@ -4595,7 +4743,7 @@ def detect_agents_active_vod(
             frame = frame_info.frame
 
             # Detect agents for all 10 players
-            detected_agents = []
+            detected_agents: list[tuple[int, str | None]] = []
             all_detected = True
 
             for player_idx in range(10):
@@ -4609,7 +4757,7 @@ def detect_agents_active_vod(
             # Show results
             if show_all or all_detected:
                 typer.echo(f"[{timestamp:7.2f}s] Frame {frame_count}:")
-                
+
                 # Left side (0-4)
                 typer.echo("  LEFT side (0-4):")
                 for player_idx in range(5):
@@ -4617,8 +4765,10 @@ def detect_agents_active_vod(
                     if agent_name:
                         typer.secho(f"    Player {player_idx}: {agent_name}", fg=typer.colors.GREEN)
                     else:
-                        typer.secho(f"    Player {player_idx}: Not detected", fg=typer.colors.YELLOW)
-                
+                        typer.secho(
+                            f"    Player {player_idx}: Not detected", fg=typer.colors.YELLOW
+                        )
+
                 # Right side (5-9)
                 typer.echo("  RIGHT side (5-9):")
                 for player_idx in range(5, 10):
@@ -4626,8 +4776,10 @@ def detect_agents_active_vod(
                     if agent_name:
                         typer.secho(f"    Player {player_idx}: {agent_name}", fg=typer.colors.GREEN)
                     else:
-                        typer.secho(f"    Player {player_idx}: Not detected", fg=typer.colors.YELLOW)
-                
+                        typer.secho(
+                            f"    Player {player_idx}: Not detected", fg=typer.colors.YELLOW
+                        )
+
                 typer.echo("")
 
             # Track first successful detection of all 10
@@ -4639,7 +4791,7 @@ def detect_agents_active_vod(
                     bold=True,
                 )
                 typer.echo("")
-                
+
                 # Print summary
                 typer.echo("Agent Summary:")
                 typer.echo("  LEFT side (0-4):")
@@ -4649,7 +4801,7 @@ def detect_agents_active_vod(
                 for player_idx in range(5, 10):
                     typer.echo(f"    Player {player_idx}: {detected_agents[player_idx][1]}")
                 typer.echo("")
-                
+
                 # Exit unless show_all is enabled
                 if not show_all:
                     break
@@ -4668,7 +4820,9 @@ def detect_agents_active_vod(
                 fg=typer.colors.GREEN,
             )
         else:
-            typer.secho("Could not detect all 10 agents in the processed frames", fg=typer.colors.YELLOW)
+            typer.secho(
+                "Could not detect all 10 agents in the processed frames", fg=typer.colors.YELLOW
+            )
 
     except Exception as e:
         typer.secho(f"\nError: {e}", fg=typer.colors.RED, err=True)

@@ -1,8 +1,8 @@
 from __future__ import annotations
+
 import logging
 import sys
 from typing import Optional
-
 
 _DEFAULT_FMT = "%(asctime)s [%(levelname)s] (%(name)s): %(message)s"
 _DEFAULT_DATEFMT = "%Y-%m-%d %H:%M:%S"

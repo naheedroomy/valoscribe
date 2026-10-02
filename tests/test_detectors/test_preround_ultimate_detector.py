@@ -1,10 +1,12 @@
 """Unit tests for pre-round ultimate detector."""
 
 from __future__ import annotations
+
 from unittest.mock import Mock
-import pytest
-import numpy as np
+
 import cv2
+import numpy as np
+import pytest
 
 from valoscribe.detectors.preround_ultimate_detector import PreroundUltimateDetector
 from valoscribe.types.detections import UltimateInfo
@@ -56,8 +58,6 @@ class TestPreroundUltimateDetector:
             for i in range(num_segments):
                 angle = i * segment_angle
                 # Draw small arc/blob for each segment
-                start_angle = int(angle - 10)
-                end_angle = int(angle + 10)
                 # Draw as filled circle at position around ring
                 angle_rad = np.radians(angle)
                 x = int(center[0] + 18 * np.cos(angle_rad))

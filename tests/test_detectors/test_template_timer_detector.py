@@ -1,11 +1,12 @@
 """Unit tests for template-based timer detector."""
 
 from __future__ import annotations
+
 from unittest.mock import Mock, patch
-from pathlib import Path
-import pytest
-import numpy as np
+
 import cv2
+import numpy as np
+import pytest
 
 from valoscribe.detectors.template_timer_detector import TemplateTimerDetector
 from valoscribe.types.detections import TimerInfo
@@ -293,7 +294,8 @@ class TestTemplateTimerDetector:
         """Test filtering when matches overlap significantly."""
         matches = [
             {"digit": "1", "confidence": 0.95, "x": 0, "y": 0, "w": 20, "h": 30},
-            {"digit": "7", "confidence": 0.85, "x": 5, "y": 0, "w": 20, "h": 30},  # Overlaps with "1"
+            {"digit": "7", "confidence": 0.85, "x": 5, "y": 0, "w": 20, "h": 30},
+            # Overlaps with "1"
         ]
 
         filtered = detector._filter_overlapping_matches(matches)
@@ -306,8 +308,10 @@ class TestTemplateTimerDetector:
     def test_filter_overlapping_matches_preserves_order(self, detector):
         """Test that filtering and re-sorting preserves left-to-right order."""
         matches = [
-            {"digit": "4", "confidence": 0.95, "x": 25, "y": 0, "w": 20, "h": 30},  # Right, higher conf
-            {"digit": "1", "confidence": 0.90, "x": 0, "y": 0, "w": 20, "h": 30},   # Left, lower conf
+            {"digit": "4", "confidence": 0.95, "x": 25, "y": 0, "w": 20, "h": 30},
+            # Right, higher confidence
+            {"digit": "1", "confidence": 0.90, "x": 0, "y": 0, "w": 20, "h": 30},
+            # Left, lower confidence
         ]
 
         filtered = detector._filter_overlapping_matches(matches)

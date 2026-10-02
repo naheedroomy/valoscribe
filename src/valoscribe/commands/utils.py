@@ -1,22 +1,24 @@
 """Utility commands for video processing and analysis."""
 
-import typer
 import json
-from typing import Optional
 from pathlib import Path
+from typing import Optional
 
 import cv2
 import numpy as np
+import typer
 
-from valoscribe.video.youtube import download_youtube
-from valoscribe.video.reader import VideoReader
 from valoscribe.detectors.cropper import Cropper
 from valoscribe.utils.logger import setup_logging
+from valoscribe.video.reader import VideoReader
+from valoscribe.video.youtube import download_youtube
 
 app = typer.Typer(help="Utility commands for video processing")
 @app.command()
 def download(
-    url: str = typer.Argument(..., help="YouTube URL of the Valorant VOD (supports timestamped URLs)"),
+    url: str = typer.Argument(
+        ..., help="YouTube URL of the Valorant VOD (supports timestamped URLs)"
+    ),
     output_dir: Path = typer.Option(
         Path("./videos"),
         "--output",
@@ -66,13 +68,13 @@ def download(
         typer.echo(f"Downloading from: {url}")
         typer.echo(f"Target: {height}p @ {fps}fps -> {output_dir}")
         if start_time is not None or 't=' in url:
-            typer.echo(f"Timestamped section download enabled")
+            typer.echo("Timestamped section download enabled")
             if start_time:
                 typer.echo(f"  Start: {start_time}s")
             if duration:
                 typer.echo(f"  Duration: {duration}s")
             else:
-                typer.echo(f"  Duration: 5400s (90 min default)")
+                typer.echo("  Duration: 5400s (90 min default)")
 
         result = download_youtube(
             url=url,
@@ -84,7 +86,7 @@ def download(
             duration=duration,
         )
 
-        typer.secho(f"\nSuccess!", fg=typer.colors.GREEN, bold=True)
+        typer.secho("\nSuccess!", fg=typer.colors.GREEN, bold=True)
         typer.echo(f"File: {result.out_path}")
         typer.echo(f"Title: {result.title}")
         typer.echo(f"Resolution: {result.height}p @ {result.fps}fps")
@@ -339,7 +341,9 @@ def crop(
                     frame_dir.mkdir(exist_ok=True)
 
                     # Save simple regions
-                    for region_name in ["round_number", "team1_score", "team2_score", "round_timer", "minimap"]:
+                    for region_name in [
+                        "round_number", "team1_score", "team2_score", "round_timer", "minimap"
+                    ]:
                         crop = cropped_regions[region_name]
                         filename = f"{region_name}.{crop_format}"
                         if crop.size > 0:
@@ -396,7 +400,9 @@ def crop(
 
                     # Left side pre-round (players 0-4)
                     for i in range(5):
-                        y_start = player_info_preround["y"] + i * (individual_height_preround + offset_preround)
+                        y_start = player_info_preround["y"] + i * (
+                            individual_height_preround + offset_preround
+                        )
                         y_end = y_start + individual_height_preround
                         x_start = player_info_preround["x"]
                         x_end = x_start + player_info_preround["width"]
@@ -408,7 +414,9 @@ def crop(
 
                     # Right side pre-round (players 5-9) - need to mirror
                     for i in range(5):
-                        y_start = player_info_preround["y"] + i * (individual_height_preround + offset_preround)
+                        y_start = player_info_preround["y"] + i * (
+                            individual_height_preround + offset_preround
+                        )
                         y_end = y_start + individual_height_preround
                         x_start = player_info_preround["x"]
                         x_end = x_start + player_info_preround["width"]
@@ -437,7 +445,9 @@ def crop(
                     crop = cropped_regions[region_name]
                     if crop.size > 0:
                         # Resize for better visibility
-                        resized = cv2.resize(crop, None, fx=2, fy=2, interpolation=cv2.INTER_NEAREST)
+                        resized = cv2.resize(
+                            crop, None, fx=2, fy=2, interpolation=cv2.INTER_NEAREST
+                        )
                         simple_display.append(resized)
 
                 # Stack simple regions horizontally if they exist
@@ -448,7 +458,9 @@ def crop(
                     for img in simple_display:
                         if img.shape[0] < max_height:
                             pad = max_height - img.shape[0]
-                            img = cv2.copyMakeBorder(img, 0, pad, 0, 0, cv2.BORDER_CONSTANT, value=[0, 0, 0])
+                            img = cv2.copyMakeBorder(
+                                img, 0, pad, 0, 0, cv2.BORDER_CONSTANT, value=[0, 0, 0]
+                            )
                         padded.append(img)
                     simple_grid = np.hstack(padded)
                     cv2.imshow("Simple Regions", simple_grid)
@@ -472,7 +484,9 @@ def crop(
                         crop = player_crops.get(ability_name, np.array([]))
                         if crop.size > 0:
                             # Resize for visibility
-                            resized = cv2.resize(crop, None, fx=3, fy=3, interpolation=cv2.INTER_NEAREST)
+                            resized = cv2.resize(
+                                crop, None, fx=3, fy=3, interpolation=cv2.INTER_NEAREST
+                            )
                             ability_crops.append(resized)
 
                     if ability_crops:
@@ -482,7 +496,9 @@ def crop(
                         for c in ability_crops:
                             if c.shape[0] < max_h:
                                 pad = max_h - c.shape[0]
-                                c = cv2.copyMakeBorder(c, 0, pad, 0, 0, cv2.BORDER_CONSTANT, value=[0, 0, 0])
+                                c = cv2.copyMakeBorder(
+                                    c, 0, pad, 0, 0, cv2.BORDER_CONSTANT, value=[0, 0, 0]
+                                )
                             padded.append(c)
                         abilities_display = np.hstack(padded)
                         cv2.imshow(f"Player {i} Abilities", abilities_display)
@@ -490,7 +506,9 @@ def crop(
                     # Show ultimate
                     ult_crop = player_crops.get("ultimate", np.array([]))
                     if ult_crop.size > 0:
-                        ult_resized = cv2.resize(ult_crop, None, fx=2, fy=2, interpolation=cv2.INTER_NEAREST)
+                        ult_resized = cv2.resize(
+                            ult_crop, None, fx=2, fy=2, interpolation=cv2.INTER_NEAREST
+                        )
                         cv2.imshow(f"Player {i} Ultimate", ult_resized)
 
                 # Status update

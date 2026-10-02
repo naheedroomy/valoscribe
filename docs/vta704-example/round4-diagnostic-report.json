@@ -1,0 +1,53 @@
+{
+  "accepted_candidate_count": 126138,
+  "anonymous_tracklet_count": 557,
+  "artifacts": {
+    "anonymous_tracklets": "anonymous_tracklets.parquet",
+    "diagnostic_json": "diagnostic_report.json",
+    "diagnostic_markdown": "report.md",
+    "minimap_replay": "anonymous_minimap_replay.mp4",
+    "raw_candidates": "raw_observations.jsonl",
+    "run_manifest": "anonymous_run.json"
+  },
+  "association_confidence": {
+    "maximum": 0.0,
+    "minimum": 0.0
+  },
+  "candidate_count": 329997,
+  "canonical_map_coordinates": "unavailable",
+  "color_config_sha256": "cbee57bba5010354bc891fe3821b800cdb56bdfd0616ea9c0d853c3f283fe4a1",
+  "config_sha256": "f4ffb0353fc7407a43f5faef0659206735319b3d522a7d5153e48602ffb8de37",
+  "context_live_frame_count": 23,
+  "context_nonlive_frame_count": 0,
+  "context_unknown_frame_count": 4898,
+  "decoded_frame_count": 4921,
+  "detector_confidence": {
+    "maximum": 0.885601260212358,
+    "minimum": 0.04565440955509812
+  },
+  "end_frame_index": 20520,
+  "end_source_pts": 5253120,
+  "frames_without_tracklet_sample": 4898,
+  "hud_config_sha256": "14cff68b034b32cdac6841e9e5534b456b53b0953ac7ec8ec8470f7590f489e3",
+  "inference_scope": "diagnostic_tracklet_only",
+  "map_asset_sha256": "6094459e109b1f4e9d500277ebc4ce1392dd98fb4f2d92005be932105be8a593",
+  "map_config_sha256": "04e85050b9314d200d65927ad8ea305b7a086bb24b0d7b84c03412e410cc500e",
+  "map_id": "7eaecc1b-4337-bbf6-6ab9-04b8f06b3319",
+  "map_number": 3,
+  "observed_sample_count": 557,
+  "player_identity": "unavailable",
+  "quality_metrics": "unavailable_without_independent_ground_truth",
+  "rejected_candidate_count": 203859,
+  "report_kind": "anonymous_minimap_diagnostic",
+  "requested_frame_count": 4921,
+  "round_number": 4,
+  "run_id": "vta404-ascent-map3-round4-diagnostic-r1",
+  "schema_version": "1.0",
+  "source_path": "redacted-local-source-path.mp4",
+  "source_video_sha256": "a2feb25b842b6c1c2baa17f8ef0c5ecfe1816bd058a1c256350fa95900454c44",
+  "start_frame_index": 15600,
+  "start_source_pts": 3993600,
+  "tactical_claims": "not_made",
+  "timebase_denominator": 15360,
+  "timebase_numerator": 1
+}

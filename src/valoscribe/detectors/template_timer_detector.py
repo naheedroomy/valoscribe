@@ -5,8 +5,9 @@ Uses template matching instead of OCR to detect round timer.
 """
 
 from __future__ import annotations
-from typing import Optional
+
 from pathlib import Path
+from typing import Any, Optional
 
 import cv2
 import numpy as np
@@ -70,7 +71,7 @@ class TemplateTimerDetector:
         Returns:
             Dictionary mapping digit strings to template images
         """
-        templates = {}
+        templates: dict[str, np.ndarray] = {}
 
         if not self.template_dir.exists():
             log.warning(f"Template directory does not exist: {self.template_dir}")
@@ -271,7 +272,7 @@ class TemplateTimerDetector:
         # Sort by confidence (descending)
         sorted_matches = sorted(matches, key=lambda m: m["confidence"], reverse=True)
 
-        filtered = []
+        filtered: list[dict[str, Any]] = []
 
         for match in sorted_matches:
             # Check if this match overlaps with any already accepted match

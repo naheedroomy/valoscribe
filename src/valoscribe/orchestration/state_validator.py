@@ -1,9 +1,10 @@
 """State validator for detecting and validating state transitions."""
 
 from __future__ import annotations
+
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional, cast
 
 from valoscribe.utils.logger import get_logger
 
@@ -37,7 +38,7 @@ class StateValidator:
         self.agent_config = self._load_agent_config(agent_config_path)
 
         # Ability change confirmation tracking
-        # Format: {player_name: {ability_key: {"first_timestamp": float, "old": int, "new": int, "count": int}}}
+        # Format: player → ability → pending change details.
         self.pending_ability_changes: dict[str, dict[str, dict]] = {}
 
         log.info(f"StateValidator initialized with {len(self.agent_config)} agents")
@@ -56,7 +57,7 @@ class StateValidator:
             config = json.load(f)
 
         log.debug(f"Loaded agent config from {config_path}")
-        return config
+        return cast(dict[str, Any], config)
 
     def validate_player_state(
         self,
@@ -126,7 +127,8 @@ class StateValidator:
         """
         Validate ability transitions and generate usage/recharge events.
 
-        Uses 2-frame confirmation to prevent false events during UI transitions (e.g., death effects).
+        Uses 2-frame confirmation to prevent false events during UI transitions.
+        (For example, death effects.)
         Events are fired with the timestamp of the FIRST detection, not the confirmation frame.
 
         Args:
@@ -139,7 +141,7 @@ class StateValidator:
         Returns:
             List of ability event dictionaries
         """
-        events = []
+        events: list[dict[str, Any]] = []
         agent_config = self.agent_config[agent_name]
         player_name = metadata["name"]
 
@@ -175,7 +177,8 @@ class StateValidator:
                     # Value stayed stable - increment confirmation count
                     pending["count"] += 1
                     log.debug(
-                        f"[ABILITY] {player_name} {ability_key}: Stable confirmation {pending['count']}/2 "
+                        f"[ABILITY] {player_name} {ability_key}: "
+                        f"Stable confirmation {pending['count']}/2 "
                         f"(value={curr_charges})"
                     )
 
@@ -203,7 +206,8 @@ class StateValidator:
                 elif curr_charges == pending["old"]:
                     # Value reverted back to old - cancel pending
                     log.debug(
-                        f"[ABILITY] {player_name} {ability_key}: Reverted to old value, clearing pending"
+                        f"[ABILITY] {player_name} {ability_key}: "
+                        "Reverted to old value, clearing pending"
                     )
                     del self.pending_ability_changes[player_name][ability_key]
                 else:
@@ -317,7 +321,7 @@ class StateValidator:
         Returns:
             List of ultimate event dictionaries
         """
-        events = []
+        events: list[dict[str, Any]] = []
 
         prev_ult = previous.get("ultimate")
         curr_ult = current.get("ultimate")

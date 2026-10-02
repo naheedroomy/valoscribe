@@ -1,10 +1,12 @@
 """Unit tests for GameStateManager."""
 
 from __future__ import annotations
-import pytest
-from pathlib import Path
-import tempfile
+
 import shutil
+import tempfile
+from pathlib import Path
+
+import pytest
 
 from valoscribe.orchestration.game_state_manager import GameStateManager
 from valoscribe.orchestration.phase_detector import Phase
@@ -54,7 +56,7 @@ class TestGameStateManager:
         video_path = temp_dir / "test_video.mp4"
 
         # Create a minimal video file (10 frames of black)
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         out = cv2.VideoWriter(str(video_path), fourcc, 30.0, (1920, 1080))
 
         for _ in range(10):
@@ -76,7 +78,9 @@ class TestGameStateManager:
 
         assert manager.video_path == dummy_video_path
         assert manager.fps == 4.0
-        assert manager.current_phase == Phase.NON_GAME
+        # Phase is unknown until the first frame is detected; NON_GAME frames
+        # do not become the manager's current game phase.
+        assert manager.current_phase is None
         assert manager.frame_count == 0
 
     def test_components_initialized(self, dummy_video_path, vlr_metadata, temp_dir):
@@ -97,26 +101,40 @@ class TestGameStateManager:
         assert manager.output_writer is not None
 
     def test_player_trackers_initialized(self, dummy_video_path, vlr_metadata, temp_dir):
-        """Test that player trackers are initialized from VLR metadata."""
+        """Player trackers remain uninitialized until valid scoreboard evidence."""
         manager = GameStateManager(
             video_path=dummy_video_path,
             vlr_metadata=vlr_metadata,
             output_dir=temp_dir / "output",
         )
 
-        assert len(manager.player_trackers) == 10
+        assert manager.player_trackers is None
+        # Without all ten valid agent/side detections, initialization fails
+        # closed rather than fabricating player identities from metadata.
+        manager._initialize_player_trackers_from_agents(["sova"] * 9, ["attack"] * 10)
+        assert manager.player_trackers is None
 
-        # Check first player
-        tracker0 = manager.player_trackers[0]
-        assert tracker0.metadata["name"] == "player0"
-        assert tracker0.metadata["team"] == "NRG"
-        assert tracker0.metadata["agent"] == "sova"
+        manager._initialize_player_trackers_from_agents(["sova"] * 10, ["attack"] * 9)
+        assert manager.player_trackers is None
 
-        # Check last player
-        tracker9 = manager.player_trackers[9]
-        assert tracker9.metadata["name"] == "player9"
-        assert tracker9.metadata["team"] == "FNATIC"
-        assert tracker9.metadata["agent"] == "killjoy"
+    def test_unmatched_team_names_do_not_initialize_trackers(
+        self, dummy_video_path, vlr_metadata, temp_dir
+    ):
+        """Unknown agent compositions do not index VLR teams with None."""
+        manager = GameStateManager(
+            video_path=dummy_video_path,
+            vlr_metadata=vlr_metadata,
+            output_dir=temp_dir / "output",
+        )
+        for team in manager.vlr_metadata["teams"]:
+            team["starting_side"] = "unknown"
+
+        manager._initialize_player_trackers_from_agents(
+            ["unknown-agent"] * 10,
+            ["attack"] * 5 + ["defense"] * 5,
+        )
+
+        assert manager.player_trackers is None
 
     def test_phase_detector_initialized(self, dummy_video_path, vlr_metadata, temp_dir):
         """Test that phase detector is initialized with correct detectors."""
@@ -130,7 +148,10 @@ class TestGameStateManager:
         assert manager.phase_detector.timer_detector is manager.detector_registry.timer_detector
         assert manager.phase_detector.spike_detector is manager.detector_registry.spike_detector
         assert manager.phase_detector.score_detector is manager.detector_registry.score_detector
-        assert manager.phase_detector.credits_detector is manager.detector_registry.preround_credits_detector
+        assert (
+            manager.phase_detector.credits_detector
+            is manager.detector_registry.preround_credits_detector
+        )
 
     def test_detect_alive_players_all_none(self, dummy_video_path, vlr_metadata, temp_dir):
         """Test _detect_alive_players with no health detections."""
@@ -202,10 +223,13 @@ class TestGameStateManager:
 
         manager._handle_phase_transition(Phase.POST_ROUND, Phase.ACTIVE_ROUND, 110.0)
 
-        # Should add round_start event
+        # The transition starts the next round and emits both the round and
+        # match start events when no earlier round has started.
         events = manager.event_collector.get_all_events()
-        assert len(events) == 1
-        assert events[0]["type"] == "round_start"
+        assert [event["type"] for event in events] == ["round_start", "match_start"]
+        assert events[0]["round_number"] == 1
+        assert events[1]["team1"] == "NRG"
+        assert events[1]["team2"] == "FNATIC"
 
         # Timers should be reset
         assert manager.timer_manager.spike_planted_at is None

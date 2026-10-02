@@ -1,7 +1,7 @@
 """Killfeed deduplicator for preventing duplicate event logging."""
 
 from __future__ import annotations
-from typing import Optional
+
 from collections import deque
 
 from valoscribe.types.detections import KillfeedAgentDetection

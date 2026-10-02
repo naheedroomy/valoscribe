@@ -1,10 +1,11 @@
 """Output writer for frame states and event logs."""
 
 from __future__ import annotations
+
 import csv
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Literal, Optional, TextIO
 
 from valoscribe.orchestration.phase_detector import Phase
 from valoscribe.utils.logger import get_logger
@@ -37,8 +38,8 @@ class OutputWriter:
         self.event_log_path = self.output_dir / "event_log.jsonl"
 
         # File handles and writers
-        self.frame_states_file: Optional[object] = None
-        self.event_log_file: Optional[object] = None
+        self.frame_states_file: Optional[TextIO] = None
+        self.event_log_file: Optional[TextIO] = None
         self.frame_states_writer: Optional[csv.DictWriter] = None
 
         # Track if headers have been written
@@ -136,8 +137,16 @@ class OutputWriter:
             "score_team1": scores[0],
             "score_team2": scores[1],
             "game_timer": f"{timers['game_timer']:.3f}" if timers['game_timer'] is not None else "",
-            "spike_timer": f"{timers['spike_timer']:.3f}" if timers['spike_timer'] is not None else "",
-            "post_round_timer": f"{timers['post_round_timer']:.3f}" if timers['post_round_timer'] is not None else "",
+            "spike_timer": (
+                f"{timers['spike_timer']:.3f}"
+                if timers["spike_timer"] is not None
+                else ""
+            ),
+            "post_round_timer": (
+                f"{timers['post_round_timer']:.3f}"
+                if timers["post_round_timer"] is not None
+                else ""
+            ),
         }
 
         # Add player data
@@ -166,7 +175,9 @@ class OutputWriter:
                 row[f"{prefix}ultimate_charges"] = ""
                 row[f"{prefix}ultimate_full"] = ""
 
-        self.frame_states_writer.writerow(row)
+        frame_states_writer = self.frame_states_writer
+        assert frame_states_writer is not None
+        frame_states_writer.writerow(row)
 
     def write_event(self, event: dict) -> None:
         """
@@ -182,8 +193,10 @@ class OutputWriter:
             log.debug("Initialized event_log.jsonl")
 
         # Write event as a single JSON line
-        json.dump(event, self.event_log_file)
-        self.event_log_file.write("\n")
+        event_log_file = self.event_log_file
+        assert event_log_file is not None
+        json.dump(event, event_log_file)
+        event_log_file.write("\n")
 
     def write_events(self, events: list[dict]) -> None:
         """
@@ -214,11 +227,13 @@ class OutputWriter:
             self.event_log_file = None
             log.info(f"Closed event_log.jsonl: {self.event_log_path}")
 
-    def __enter__(self):
+    def __enter__(self) -> OutputWriter:
         """Context manager entry."""
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self, exc_type: object, exc_val: object, exc_tb: object
+    ) -> Literal[False]:
         """Context manager exit."""
         self.close()
         return False

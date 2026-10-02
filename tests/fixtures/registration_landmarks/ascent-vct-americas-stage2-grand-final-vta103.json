@@ -1,0 +1,376 @@
+{
+  "schema_version": "1.0",
+  "evaluation_id": "ascent-vct-americas-stage2-grand-final-vta103",
+  "label_status": "provisional_visually_reviewed",
+  "coordinate_note": "Landmarks were independently placed on the unwarped minimap crop and canonical asset; none were derived from a registration transform.",
+  "source_video": {
+    "filename": "YTDown.com_YouTube_Media_4LEGEQ8KBS0_100T-vs-LOUD-VCT-Americas-Stage-2-Playoffs-Grand-Final-Map-3-Ascent_001_1080p.mp4",
+    "availability": "external local file; video pixels are not included in this repository",
+    "frame_dimensions_px": {
+      "width": 1920,
+      "height": 1080
+    },
+    "crop_dimensions_px": {
+      "width": 360,
+      "height": 400
+    },
+    "crop_profile": "vct_americas_2026_stage2_final_1080p_candidate",
+    "crop_orientation": "rotate_90_ccw"
+  },
+  "canonical_asset": {
+    "path": "src/valoscribe/config/maps/ascent_public_content_13_06.png",
+    "dimensions_px": {
+      "width": 2048,
+      "height": 2048
+    },
+    "asset_version": "Riot Public Content Catalog release 13.06",
+    "decoded_image_sha256": "14b91544abe32234934cafe24be330a488743a99295f49aec5c317c62740d984"
+  },
+  "uncertainty": {
+    "source_crop_px_approx": "±2 px (L1, L2, L3, L5); ±3 px (L4)",
+    "canonical_asset_px_approx": "±8 px (L1, L2, L3, L5); ±10 px (L4)",
+    "limitation": "Independently reviewed visual estimates, not pixel-verified ground truth; uncertainty applies per annotation."
+  },
+  "samples": [
+    {
+      "sample_id": "vod-300s",
+      "split": "train",
+      "timestamp_seconds": 300,
+      "source_frame_decoded_sha256": "5c2a744e937c91a550938ee3649aa868b8c28d53ac410c71aa5c48af4c5238dd",
+      "provenance": "Reviewer 1 visually annotated the source crop and canonical asset independently; confirmed again at 840 seconds.",
+      "labels": {
+        "provenance": "Reviewer 1; independent visual annotation on unwarped crop and canonical asset; confirmed at 300 and 840 seconds; approximate, not pixel-verified.",
+        "source_frame_sha256": "5c2a744e937c91a550938ee3649aa868b8c28d53ac410c71aa5c48af4c5238dd",
+        "canonical_asset_sha256": "14b91544abe32234934cafe24be330a488743a99295f49aec5c317c62740d984",
+        "landmarks": [
+          {
+            "landmark_id": "L1_upper_cap_left",
+            "source_crop_point": {
+              "x": 177,
+              "y": 8
+            },
+            "canonical_point": {
+              "x": 82,
+              "y": 1031
+            }
+          },
+          {
+            "landmark_id": "L2_upper_cap_right",
+            "source_crop_point": {
+              "x": 230,
+              "y": 8
+            },
+            "canonical_point": {
+              "x": 82,
+              "y": 773
+            }
+          },
+          {
+            "landmark_id": "L3_A_outer_upper_right",
+            "source_crop_point": {
+              "x": 354,
+              "y": 87
+            },
+            "canonical_point": {
+              "x": 466,
+              "y": 159
+            }
+          },
+          {
+            "landmark_id": "L4_B_leftmost_protrusion_upper",
+            "source_crop_point": {
+              "x": 6,
+              "y": 82
+            },
+            "canonical_point": {
+              "x": 453,
+              "y": 1872
+            }
+          },
+          {
+            "landmark_id": "L5_lower_cap_bottom_left",
+            "source_crop_point": {
+              "x": 130,
+              "y": 392
+            },
+            "canonical_point": {
+              "x": 1981,
+              "y": 1260
+            }
+          }
+        ]
+      }
+    },
+    {
+      "sample_id": "vod-840s",
+      "split": "train",
+      "timestamp_seconds": 840,
+      "source_frame_decoded_sha256": "4b78108d3e8b9e12527c5bb95389e545a86efd0763822793574d5b996176f950",
+      "provenance": "Reviewer 1 visually annotated the source crop and canonical asset independently; confirmed again at 300 seconds.",
+      "labels": {
+        "provenance": "Reviewer 1; independent visual annotation on unwarped crop and canonical asset; confirmed at 300 and 840 seconds; approximate, not pixel-verified.",
+        "source_frame_sha256": "4b78108d3e8b9e12527c5bb95389e545a86efd0763822793574d5b996176f950",
+        "canonical_asset_sha256": "14b91544abe32234934cafe24be330a488743a99295f49aec5c317c62740d984",
+        "landmarks": [
+          {
+            "landmark_id": "L1_upper_cap_left",
+            "source_crop_point": {
+              "x": 177,
+              "y": 8
+            },
+            "canonical_point": {
+              "x": 82,
+              "y": 1031
+            }
+          },
+          {
+            "landmark_id": "L2_upper_cap_right",
+            "source_crop_point": {
+              "x": 230,
+              "y": 8
+            },
+            "canonical_point": {
+              "x": 82,
+              "y": 773
+            }
+          },
+          {
+            "landmark_id": "L3_A_outer_upper_right",
+            "source_crop_point": {
+              "x": 354,
+              "y": 87
+            },
+            "canonical_point": {
+              "x": 466,
+              "y": 159
+            }
+          },
+          {
+            "landmark_id": "L4_B_leftmost_protrusion_upper",
+            "source_crop_point": {
+              "x": 6,
+              "y": 82
+            },
+            "canonical_point": {
+              "x": 453,
+              "y": 1872
+            }
+          },
+          {
+            "landmark_id": "L5_lower_cap_bottom_left",
+            "source_crop_point": {
+              "x": 130,
+              "y": 392
+            },
+            "canonical_point": {
+              "x": 1981,
+              "y": 1260
+            }
+          }
+        ]
+      }
+    },
+    {
+      "sample_id": "vod-2460s",
+      "split": "validation",
+      "timestamp_seconds": 2460,
+      "source_frame_decoded_sha256": "995e98878b7c701f2866c4a20ab7efab15210867e84c5455d67a1bafabe8d504",
+      "provenance": "Reviewer 2 independently visually annotated four landmarks; L4 was not confirmed and is intentionally omitted.",
+      "labels": {
+        "provenance": "Reviewer 2; independent visual annotation on unwarped crop and canonical asset at 2460 seconds; L4 unconfirmed; approximate, not pixel-verified.",
+        "source_frame_sha256": "995e98878b7c701f2866c4a20ab7efab15210867e84c5455d67a1bafabe8d504",
+        "canonical_asset_sha256": "14b91544abe32234934cafe24be330a488743a99295f49aec5c317c62740d984",
+        "landmarks": [
+          {
+            "landmark_id": "L1_upper_cap_left",
+            "source_crop_point": {
+              "x": 177,
+              "y": 8
+            },
+            "canonical_point": {
+              "x": 82,
+              "y": 1030
+            }
+          },
+          {
+            "landmark_id": "L2_upper_cap_right",
+            "source_crop_point": {
+              "x": 229,
+              "y": 8
+            },
+            "canonical_point": {
+              "x": 82,
+              "y": 773
+            }
+          },
+          {
+            "landmark_id": "L3_A_outer_upper_right",
+            "source_crop_point": {
+              "x": 354,
+              "y": 85
+            },
+            "canonical_point": {
+              "x": 466,
+              "y": 159
+            }
+          },
+          {
+            "landmark_id": "L5_lower_cap_bottom_left",
+            "source_crop_point": {
+              "x": 130,
+              "y": 392
+            },
+            "canonical_point": {
+              "x": 1980,
+              "y": 1260
+            }
+          }
+        ]
+      }
+    },
+    {
+      "sample_id": "vod-2820s",
+      "split": "test",
+      "timestamp_seconds": 2820,
+      "source_frame_decoded_sha256": "56a89f2e7ae80eb51074fc28119f692e924e5895acd1c3c0ea18c960b4e848f9",
+      "provenance": "Reviewer independently annotated all five landmarks on the unwarped 360×400 source crop and 2048×2048 canonical asset; clear minimap frame; approximate, not pixel-verified.",
+      "labels": {
+        "provenance": "Independent reviewer; source crop and canonical asset labeled separately without using a warp; clear minimap frame; uncertainty ±2 source/±8 canonical pixels (L1, L2, L3, L5), ±3 source/±10 canonical pixels (L4).",
+        "source_frame_sha256": "56a89f2e7ae80eb51074fc28119f692e924e5895acd1c3c0ea18c960b4e848f9",
+        "canonical_asset_sha256": "14b91544abe32234934cafe24be330a488743a99295f49aec5c317c62740d984",
+        "landmarks": [
+          {
+            "landmark_id": "L1_upper_cap_left",
+            "source_crop_point": {
+              "x": 177,
+              "y": 8
+            },
+            "canonical_point": {
+              "x": 82,
+              "y": 1031
+            }
+          },
+          {
+            "landmark_id": "L2_upper_cap_right",
+            "source_crop_point": {
+              "x": 229,
+              "y": 8
+            },
+            "canonical_point": {
+              "x": 82,
+              "y": 773
+            }
+          },
+          {
+            "landmark_id": "L3_A_outer_upper_right",
+            "source_crop_point": {
+              "x": 353,
+              "y": 86
+            },
+            "canonical_point": {
+              "x": 466,
+              "y": 159
+            }
+          },
+          {
+            "landmark_id": "L4_B_leftmost_protrusion_upper",
+            "source_crop_point": {
+              "x": 6,
+              "y": 82
+            },
+            "canonical_point": {
+              "x": 453,
+              "y": 1872
+            }
+          },
+          {
+            "landmark_id": "L5_lower_cap_bottom_left",
+            "source_crop_point": {
+              "x": 130,
+              "y": 392
+            },
+            "canonical_point": {
+              "x": 1981,
+              "y": 1260
+            }
+          }
+        ]
+      }
+    },
+    {
+      "sample_id": "vod-2940s",
+      "split": "test",
+      "timestamp_seconds": 2940,
+      "source_frame_decoded_sha256": "6aa5a721538da797d3c325c04e2380b0d6c12374efb850e9184db0d2324807fe",
+      "provenance": "Reviewer independently annotated all five landmarks on the unwarped 360×400 source crop and 2048×2048 canonical asset; translucent scenery; landmark corners discernible; approximate, not pixel-verified.",
+      "labels": {
+        "provenance": "Independent reviewer; source crop and canonical asset labeled separately without using a warp; translucent scenery; landmark corners discernible; uncertainty ±2 source/±8 canonical pixels (L1, L2, L3, L5), ±3 source/±10 canonical pixels (L4).",
+        "source_frame_sha256": "6aa5a721538da797d3c325c04e2380b0d6c12374efb850e9184db0d2324807fe",
+        "canonical_asset_sha256": "14b91544abe32234934cafe24be330a488743a99295f49aec5c317c62740d984",
+        "landmarks": [
+          {
+            "landmark_id": "L1_upper_cap_left",
+            "source_crop_point": {
+              "x": 177,
+              "y": 8
+            },
+            "canonical_point": {
+              "x": 82,
+              "y": 1031
+            }
+          },
+          {
+            "landmark_id": "L2_upper_cap_right",
+            "source_crop_point": {
+              "x": 229,
+              "y": 8
+            },
+            "canonical_point": {
+              "x": 82,
+              "y": 773
+            }
+          },
+          {
+            "landmark_id": "L3_A_outer_upper_right",
+            "source_crop_point": {
+              "x": 353,
+              "y": 86
+            },
+            "canonical_point": {
+              "x": 466,
+              "y": 159
+            }
+          },
+          {
+            "landmark_id": "L4_B_leftmost_protrusion_upper",
+            "source_crop_point": {
+              "x": 6,
+              "y": 82
+            },
+            "canonical_point": {
+              "x": 453,
+              "y": 1872
+            }
+          },
+          {
+            "landmark_id": "L5_lower_cap_bottom_left",
+            "source_crop_point": {
+              "x": 130,
+              "y": 392
+            },
+            "canonical_point": {
+              "x": 1981,
+              "y": 1260
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "acceptance_threshold": {
+    "maximum_per_landmark_error_px": 25,
+    "coordinate_space": "canonical image pixels",
+    "basis": "Frozen before evaluation: 3 source px × approximately 5 canonical px/source + 10 canonical px annotation uncertainty.",
+    "gate": "A split passes only when every labeled landmark reprojection error is <= 25 canonical pixels; report each split independently."
+  }
+}

@@ -1,11 +1,14 @@
 """Test active round agent detector."""
 
-import typer
-from pathlib import Path
-import cv2
+__test__ = False
 
-from valoscribe.detectors.cropper import Cropper
+from pathlib import Path
+
+import cv2
+import typer
+
 from valoscribe.detectors.active_round_agent_detector import ActiveRoundAgentDetector
+from valoscribe.detectors.cropper import Cropper
 from valoscribe.utils.logger import setup_logging
 
 app = typer.Typer(help="Test active round agent detector")
@@ -118,7 +121,7 @@ def test_active_agent_detector(
             side = "LEFT" if player_index < 5 else "RIGHT"
             typer.echo(f"✓ Detected: {agent_name} (screen position: {side})")
             if greyscale:
-                typer.echo(f"  (greyscale mode - likely dead player)")
+                typer.echo("  (greyscale mode - likely dead player)")
         else:
             typer.echo("✗ No agent detected")
 
@@ -136,7 +139,7 @@ def test_active_agent_detector(
             side = "LEFT" if player_index < 5 else "RIGHT"
             typer.echo(f"✓ Detected: {agent_name} (screen position: {side})")
             if greyscale:
-                typer.echo(f"  (greyscale mode - likely dead player)")
+                typer.echo("  (greyscale mode - likely dead player)")
         else:
             typer.echo("✗ No agent detected")
 

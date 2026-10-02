@@ -1,15 +1,15 @@
 """Extraction commands for saving crops and preprocessed templates."""
 
-import typer
-from typing import Optional
 from pathlib import Path
+from typing import Optional
 
 import cv2
 import numpy as np
+import typer
 
-from valoscribe.video.reader import VideoReader
 from valoscribe.detectors.cropper import Cropper
 from valoscribe.utils.logger import setup_logging
+from valoscribe.video.reader import VideoReader
 
 app = typer.Typer(help="Extraction commands for saving crops and templates")
 @app.command(name="score-crops")
@@ -128,8 +128,14 @@ def extract_score_crops(
                     cv2.imwrite(str(output_dir / f"{base_name}_team2_original.png"), team2_crop)
 
                     # Save preprocessed crops
-                    cv2.imwrite(str(output_dir / f"{base_name}_team1_preprocessed.png"), team1_preprocessed)
-                    cv2.imwrite(str(output_dir / f"{base_name}_team2_preprocessed.png"), team2_preprocessed)
+                    cv2.imwrite(
+                        str(output_dir / f"{base_name}_team1_preprocessed.png"),
+                        team1_preprocessed,
+                    )
+                    cv2.imwrite(
+                        str(output_dir / f"{base_name}_team2_preprocessed.png"),
+                        team2_preprocessed,
+                    )
 
                     saved_count += 1
 
@@ -148,7 +154,10 @@ def extract_score_crops(
             typer.echo(f"Frames processed: {frame_count}")
             typer.echo(f"Crop sets saved: {saved_count}")
             typer.echo(f"Output directory: {output_dir}")
-            typer.echo(f"\nPreprocessed images can be used to create digit templates (0.png - 9.png)")
+            typer.echo(
+                "\nPreprocessed images can be used to create digit templates "
+                "(0.png - 9.png)"
+            )
 
     except Exception as e:
         typer.secho(f"\nError: {e}", fg=typer.colors.RED, err=True)
@@ -234,6 +243,7 @@ def extract_credits_crops(
         fps = 1.0 / interval
 
         # Determine which players to extract
+        player_indices: range | list[int]
         if player_index == -1:
             player_indices = range(10)
             typer.echo("Extracting credits for all players")
@@ -307,7 +317,8 @@ def extract_credits_crops(
 
                         # Display progress
                         typer.secho(
-                            f"[{frame_info.timestamp_sec:7.2f}s] Player {p_idx} ({side}): Saved crop #{saved_count}",
+                            f"[{frame_info.timestamp_sec:7.2f}s] Player {p_idx} ({side}): "
+                            f"Saved crop #{saved_count}",
                             fg=typer.colors.GREEN,
                         )
 
@@ -320,7 +331,7 @@ def extract_credits_crops(
             typer.echo(f"Frames processed: {frame_count}")
             typer.echo(f"Crops saved: {saved_count}")
             typer.echo(f"Output directory: {output_dir}")
-            typer.echo(f"\nPreprocessed images can be used to create credits icon template")
+            typer.echo("\nPreprocessed images can be used to create credits icon template")
 
     except Exception as e:
         typer.secho(f"\nError: {e}", fg=typer.colors.RED, err=True)
@@ -406,6 +417,7 @@ def extract_preround_credits_crops(
         fps = 1.0 / interval
 
         # Determine which players to extract
+        player_indices: range | list[int]
         if player_index == -1:
             player_indices = range(10)
             typer.echo("Extracting pre-round credits for all players")
@@ -479,7 +491,8 @@ def extract_preround_credits_crops(
 
                         # Display progress
                         typer.secho(
-                            f"[{frame_info.timestamp_sec:7.2f}s] Player {p_idx} ({side}): Saved crop #{saved_count}",
+                            f"[{frame_info.timestamp_sec:7.2f}s] Player {p_idx} ({side}): "
+                            f"Saved crop #{saved_count}",
                             fg=typer.colors.GREEN,
                         )
 
@@ -492,7 +505,10 @@ def extract_preround_credits_crops(
             typer.echo(f"Frames processed: {frame_count}")
             typer.echo(f"Crops saved: {saved_count}")
             typer.echo(f"Output directory: {output_dir}")
-            typer.echo(f"\nPreprocessed images can be used to create pre-round credits icon template")
+            typer.echo(
+                "\nPreprocessed images can be used to create "
+                "pre-round credits icon template"
+            )
 
     except Exception as e:
         typer.secho(f"\nError: {e}", fg=typer.colors.RED, err=True)
@@ -614,7 +630,10 @@ def extract_timer_crops(
                     cv2.imwrite(str(output_dir / f"{base_name}_timer_original.png"), timer_crop)
 
                     # Save preprocessed crop
-                    cv2.imwrite(str(output_dir / f"{base_name}_timer_preprocessed.png"), timer_preprocessed)
+                    cv2.imwrite(
+                        str(output_dir / f"{base_name}_timer_preprocessed.png"),
+                        timer_preprocessed,
+                    )
 
                     saved_count += 1
 
@@ -633,7 +652,10 @@ def extract_timer_crops(
             typer.echo(f"Frames processed: {frame_count}")
             typer.echo(f"Crops saved: {saved_count}")
             typer.echo(f"Output directory: {output_dir}")
-            typer.echo(f"\nPreprocessed images can be used to create digit templates (0.png - 9.png, colon.png)")
+            typer.echo(
+                "\nPreprocessed images can be used to create digit templates "
+                "(0.png - 9.png, colon.png)"
+            )
 
     except Exception as e:
         typer.secho(f"\nError: {e}", fg=typer.colors.RED, err=True)
@@ -721,6 +743,7 @@ def extract_dead_credits_crops(
         fps = 1.0 / interval
 
         # Determine which players to extract
+        player_indices: range | list[int]
         if player_index == -1:
             player_indices = range(10)
             typer.echo("Extracting dead_credits for all players")
@@ -794,7 +817,8 @@ def extract_dead_credits_crops(
 
                         # Display progress
                         typer.secho(
-                            f"[{frame_info.timestamp_sec:7.2f}s] Player {p_idx} ({side}): Saved crop #{saved_count}",
+                            f"[{frame_info.timestamp_sec:7.2f}s] Player {p_idx} ({side}): "
+                            f"Saved crop #{saved_count}",
                             fg=typer.colors.GREEN,
                         )
 
@@ -807,7 +831,7 @@ def extract_dead_credits_crops(
             typer.echo(f"Frames processed: {frame_count}")
             typer.echo(f"Crops saved: {saved_count}")
             typer.echo(f"Output directory: {output_dir}")
-            typer.echo(f"\nPreprocessed images can be used to create dead_credits icon template")
+            typer.echo("\nPreprocessed images can be used to create dead_credits icon template")
 
     except Exception as e:
         typer.secho(f"\nError: {e}", fg=typer.colors.RED, err=True)
@@ -893,6 +917,7 @@ def extract_health_crops(
         fps = 1.0 / interval
 
         # Determine which players to extract
+        player_indices: range | list[int]
         if player_index == -1:
             player_indices = range(10)
             typer.echo("Extracting health for all players")
@@ -966,7 +991,8 @@ def extract_health_crops(
 
                         # Display progress
                         typer.secho(
-                            f"[{frame_info.timestamp_sec:7.2f}s] Player {p_idx} ({side}): Saved crop #{saved_count}",
+                            f"[{frame_info.timestamp_sec:7.2f}s] Player {p_idx} ({side}): "
+                            f"Saved crop #{saved_count}",
                             fg=typer.colors.GREEN,
                         )
 
@@ -979,7 +1005,7 @@ def extract_health_crops(
             typer.echo(f"Frames processed: {frame_count}")
             typer.echo(f"Crops saved: {saved_count}")
             typer.echo(f"Output directory: {output_dir}")
-            typer.echo(f"\nPreprocessed images can be used to create health digit templates")
+            typer.echo("\nPreprocessed images can be used to create health digit templates")
 
     except Exception as e:
         typer.secho(f"\nError: {e}", fg=typer.colors.RED, err=True)
@@ -1065,6 +1091,7 @@ def extract_armor_crops(
         fps = 1.0 / interval
 
         # Determine which players to extract
+        player_indices: range | list[int]
         if player_index == -1:
             player_indices = range(10)
             typer.echo("Extracting armor for all players")
@@ -1138,7 +1165,8 @@ def extract_armor_crops(
 
                         # Display progress
                         typer.secho(
-                            f"[{frame_info.timestamp_sec:7.2f}s] Player {p_idx} ({side}): Saved crop #{saved_count}",
+                            f"[{frame_info.timestamp_sec:7.2f}s] Player {p_idx} ({side}): "
+                            f"Saved crop #{saved_count}",
                             fg=typer.colors.GREEN,
                         )
 
@@ -1151,7 +1179,7 @@ def extract_armor_crops(
             typer.echo(f"Frames processed: {frame_count}")
             typer.echo(f"Crops saved: {saved_count}")
             typer.echo(f"Output directory: {output_dir}")
-            typer.echo(f"\nPreprocessed images can be used to create armor templates")
+            typer.echo("\nPreprocessed images can be used to create armor templates")
 
     except Exception as e:
         typer.secho(f"\nError: {e}", fg=typer.colors.RED, err=True)
@@ -1237,6 +1265,7 @@ def extract_killfeed_crops(
         fps = 1.0 / interval
 
         # Determine which entries to extract
+        entry_indices: range | list[int]
         if entry_index == -1:
             entry_indices = range(10)
             typer.echo("Extracting all killfeed entries (0-9)")
@@ -1303,7 +1332,8 @@ def extract_killfeed_crops(
 
                         # Display progress
                         typer.secho(
-                            f"[{frame_info.timestamp_sec:7.2f}s] Entry {e_idx}: Saved crop #{saved_count}",
+                            f"[{frame_info.timestamp_sec:7.2f}s] Entry {e_idx}: "
+                            f"Saved crop #{saved_count}",
                             fg=typer.colors.GREEN,
                         )
 
@@ -1316,7 +1346,7 @@ def extract_killfeed_crops(
             typer.echo(f"Frames processed: {frame_count}")
             typer.echo(f"Crops saved: {saved_count}")
             typer.echo(f"Output directory: {output_dir}")
-            typer.echo(f"\nPreprocessed images can be used for killfeed OCR analysis")
+            typer.echo("\nPreprocessed images can be used for killfeed OCR analysis")
 
     except Exception as e:
         typer.secho(f"\nError: {e}", fg=typer.colors.RED, err=True)

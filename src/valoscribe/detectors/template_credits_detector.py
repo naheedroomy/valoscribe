@@ -7,8 +7,9 @@ a dead player while low confidence indicates an alive player.
 """
 
 from __future__ import annotations
-from typing import Optional
+
 from pathlib import Path
+from typing import Optional
 
 import cv2
 import numpy as np
@@ -25,7 +26,8 @@ class TemplateCreditsDetector:
     Template matching-based detector for dead credits icon.
 
     Detects the dead credits icon in player info regions to determine
-    if a player is dead (icon visible = high confidence) or alive (icon not visible = low confidence).
+    if a player is dead (icon visible = high confidence) or alive
+    (icon not visible = low confidence).
     """
 
     def __init__(
@@ -41,7 +43,7 @@ class TemplateCreditsDetector:
         Args:
             cropper: Cropper instance for extracting HUD regions
             template_path: Path to dead credits icon template (credits_icon_dead.png)
-                          If None, uses default: src/valoscribe/templates/credits/credits_icon_dead.png
+                          If None, uses default: `credits_icon_dead.png` in templates/credits.
             min_confidence: Minimum template match confidence (0-1) for detecting dead players
             match_method: OpenCV template matching method
         """
@@ -121,7 +123,7 @@ class TemplateCreditsDetector:
 
         # Get dead_credits crop
         if "dead_credits" not in player_crop_data:
-            log.warning(f"Dead credits region not found in player crop data")
+            log.warning("Dead credits region not found in player crop data")
             return None
 
         dead_credits_crop = player_crop_data["dead_credits"]
@@ -147,13 +149,19 @@ class TemplateCreditsDetector:
         # High confidence = dead credits icon visible = player is DEAD
         # Low confidence = dead credits icon not visible = player is ALIVE
         if confidence >= self.min_confidence:
-            log.debug(f"Player {player_index} DEAD - dead credits visible with confidence: {confidence:.2f}")
+            log.debug(
+                f"Player {player_index} DEAD - dead credits visible with confidence: "
+                f"{confidence:.2f}"
+            )
             return CreditsInfo(
                 credits_visible=True,  # True = dead credits visible = player is dead
                 confidence=confidence,
             )
         else:
-            log.debug(f"Player {player_index} ALIVE - dead credits not visible (confidence: {confidence:.2f})")
+            log.debug(
+                f"Player {player_index} ALIVE - dead credits not visible "
+                f"(confidence: {confidence:.2f})"
+            )
             return CreditsInfo(
                 credits_visible=False,  # False = dead credits not visible = player is alive
                 confidence=confidence,
@@ -209,10 +217,10 @@ class TemplateCreditsDetector:
 
         player_crop_data = player_crops[player_index]
 
-        if "credits" not in player_crop_data:
+        if "dead_credits" not in player_crop_data:
             return None, np.array([]), {}
 
-        credits_crop = player_crop_data["credits"]
+        credits_crop = player_crop_data["dead_credits"]
 
         if credits_crop.size == 0:
             return None, np.array([]), {}

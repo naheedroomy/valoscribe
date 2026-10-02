@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "match_id": "vta404-diagnostic-map3",
+  "map_id": "7eaecc1b-4337-bbf6-6ab9-04b8f06b3319",
+  "round_id": "vta404-map3-round4",
+  "round_number": 4,
+  "hud_source": null,
+  "diagnostics": [
+    {
+      "schema_version": "1.0",
+      "report_path": "round4-diagnostic-report.json"
+    }
+  ]
+}

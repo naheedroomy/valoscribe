@@ -1,21 +1,25 @@
 """Main orchestrator for processing Valorant VOD frames."""
 
 from __future__ import annotations
+
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional, cast
 
 import numpy as np
 
-from valoscribe.orchestration.phase_detector import PhaseDetector, Phase
-from valoscribe.orchestration.round_manager import RoundManager
-from valoscribe.orchestration.player_state_tracker import PlayerStateTracker
 from valoscribe.orchestration.detector_registry import DetectorRegistry
-from valoscribe.orchestration.state_validator import StateValidator
 from valoscribe.orchestration.event_collector import EventCollector
 from valoscribe.orchestration.output_writer import OutputWriter
+from valoscribe.orchestration.phase_detector import Phase, PhaseDetector
+from valoscribe.orchestration.player_state_tracker import PlayerStateTracker
+from valoscribe.orchestration.round_manager import RoundManager
+from valoscribe.orchestration.state_validator import StateValidator
 from valoscribe.orchestration.timer_manager import TimerManager
-from valoscribe.video.reader import VideoReader
+from valoscribe.types.detections import (
+    KillfeedAgentDetection,
+)
 from valoscribe.utils.logger import get_logger
+from valoscribe.video.reader import VideoReader
 
 log = get_logger(__name__)
 
@@ -53,7 +57,7 @@ class GameStateManager:
         self._init_components(config_path)
 
         # Internal state
-        self.current_phase = None  # Will be set to first detected game phase
+        self.current_phase: Optional[Phase] = None  # Set to first detected game phase
         self.frame_count = 0
 
         # Match tracking
@@ -117,15 +121,20 @@ class GameStateManager:
             detected_sides: List of 10 sides ("attack"/"defense") in scoreboard order
         """
         if len(detected_agents) != 10:
-            log.warning(f"Expected 10 agents, got {len(detected_agents)}. Cannot initialize player trackers.")
+            log.warning(
+                f"Expected 10 agents, got {len(detected_agents)}. "
+                "Cannot initialize player trackers."
+            )
             return
 
         if len(detected_sides) != 10:
-            log.warning(f"Expected 10 sides, got {len(detected_sides)}. Cannot initialize player trackers.")
+            log.warning(
+                f"Expected 10 sides, got {len(detected_sides)}. Cannot initialize player trackers."
+            )
             return
 
         # Split detected agents and sides by scoreboard side
-        left_agents = detected_agents[0:5]   # Positions 0-4
+        left_agents = detected_agents[0:5]  # Positions 0-4
         right_agents = detected_agents[5:10]  # Positions 5-9
         left_sides = detected_sides[0:5]
         right_sides = detected_sides[5:10]
@@ -152,8 +161,8 @@ class GameStateManager:
         )
 
         # Group VLR players by team and get team metadata
-        vlr_teams = {}  # team_name -> list of players
-        team_metadata = {}  # team_name -> team info (including starting_side)
+        vlr_teams: dict[str, list[dict[str, Any]]] = {}
+        team_metadata: dict[str, dict[str, Any]] = {}
 
         for player in self.vlr_metadata["players"]:
             team_name = player["team"]
@@ -184,22 +193,32 @@ class GameStateManager:
             if left_side_is_attack:
                 left_team = attacking_team
                 right_team = defending_team
-                log.info(f"Matched by side detection: Left (attack) = {left_team}, Right (defense) = {right_team}")
+                log.info(
+                    f"Matched by side detection: Left (attack) = {left_team}, "
+                    f"Right (defense) = {right_team}"
+                )
             else:
                 left_team = defending_team
                 right_team = attacking_team
-                log.info(f"Matched by side detection: Left (defense) = {left_team}, Right (attack) = {right_team}")
+                log.info(
+                    f"Matched by side detection: Left (defense) = {left_team}, "
+                    f"Right (attack) = {right_team}"
+                )
         else:
             # Fallback: match by agent composition (old logic)
-            log.warning("Could not determine teams from starting_side, falling back to agent matching")
+            log.warning(
+                "Could not determine teams from starting_side, falling back to agent matching"
+            )
 
-            def find_matching_team(side_agents: list[str], vlr_teams: dict) -> tuple[str, list]:
+            def find_matching_team(
+                side_agents: list[str], teams: dict[str, list[dict[str, Any]]]
+            ) -> tuple[Optional[str], list[dict[str, Any]]]:
                 """Find which team has the most agent matches for this side."""
-                best_team = None
+                best_team: Optional[str] = None
                 best_matches = 0
-                best_players = []
+                best_players: list[dict[str, Any]] = []
 
-                for team_name, team_players in vlr_teams.items():
+                for team_name, team_players in teams.items():
                     team_agents = {p["agent"] for p in team_players}
                     matches = len(set(side_agents) & team_agents)
 
@@ -213,6 +232,13 @@ class GameStateManager:
             left_team, _ = find_matching_team(left_agents, vlr_teams)
             right_team, _ = find_matching_team(right_agents, vlr_teams)
             log.info(f"Matched by agent composition: Left = {left_team}, Right = {right_team}")
+
+        if left_team is None or right_team is None:
+            log.warning(
+                "Could not match both scoreboard sides to VLR teams; "
+                "cannot initialize player trackers"
+            )
+            return
 
         left_vlr_players = vlr_teams[left_team]
         right_vlr_players = vlr_teams[right_team]
@@ -239,7 +265,8 @@ class GameStateManager:
                     self.round_manager.starting_sides["team2"] = team_data["starting_side"]
 
             log.info(
-                f"Updated starting sides: {old_starting_sides} -> {self.round_manager.starting_sides}"
+                f"Updated starting sides: {old_starting_sides} -> "
+                f"{self.round_manager.starting_sides}"
             )
 
         # Create trackers with team-aware matching
@@ -267,7 +294,10 @@ class GameStateManager:
                     "team": matched_player["team"],
                     "agent": agent_name,
                 }
-                log.debug(f"Matched position {scoreboard_idx} ({agent_name}) → {matched_player['name']} ({team_name})")
+                log.debug(
+                    f"Matched position {scoreboard_idx} ({agent_name}) → "
+                    f"{matched_player['name']} ({team_name})"
+                )
             else:
                 # Agent not found in expected team - create placeholder
                 metadata = {
@@ -275,7 +305,10 @@ class GameStateManager:
                     "team": team_name or ("team1" if scoreboard_idx < 5 else "team2"),
                     "agent": agent_name,
                 }
-                log.warning(f"Could not match {agent_name} to {team_name} in VLR metadata, using placeholder")
+                log.warning(
+                    f"Could not match {agent_name} to {team_name} in VLR metadata, "
+                    "using placeholder"
+                )
 
             trackers.append(PlayerStateTracker(player_index=scoreboard_idx, metadata=metadata))
 
@@ -288,7 +321,10 @@ class GameStateManager:
         # Log the final mapping
         for idx, tracker in enumerate(trackers):
             side_label = "LEFT" if idx < 5 else "RIGHT"
-            log.info(f"  Position {idx} ({side_label}): {tracker.metadata['name']} - {tracker.metadata['agent']} ({tracker.metadata['team']})")
+            log.info(
+                f"  Position {idx} ({side_label}): {tracker.metadata['name']} - "
+                f"{tracker.metadata['agent']} ({tracker.metadata['team']})"
+            )
 
     def process_video(self) -> None:
         """Main processing loop - process entire video."""
@@ -326,7 +362,7 @@ class GameStateManager:
 
         # 1. Detect phase
         phase, phase_detections = self.phase_detector.detect_phase(
-            frame, self.current_phase
+            frame, self.current_phase or Phase.NON_GAME
         )
 
         # Skip NON_GAME frames entirely - don't process, don't update current_phase
@@ -354,7 +390,9 @@ class GameStateManager:
         if self.frame_count % 100 == 0:
             self._print_progress(timestamp)
 
-    def _add_timers_to_event(self, event: dict, timestamp: float, frame: np.ndarray = None) -> dict:
+    def _add_timers_to_event(
+        self, event: dict[str, Any], timestamp: float, frame: Optional[np.ndarray] = None
+    ) -> dict[str, Any]:
         """
         Add all timer values to an event.
 
@@ -373,7 +411,9 @@ class GameStateManager:
             game_timer = timer_info.time_seconds if timer_info else None
 
         # Get all timers from timer manager
-        timers = self.timer_manager.get_timers(timestamp, self.current_phase, game_timer)
+        timers = self.timer_manager.get_timers(
+            timestamp, self.current_phase or Phase.NON_GAME, game_timer
+        )
 
         # Add timers to event
         event["timers"] = {
@@ -394,7 +434,11 @@ class GameStateManager:
             return
 
         # Get unique team names
-        teams = set(tracker.metadata.get("team") for tracker in self.player_trackers)
+        teams = {
+            team
+            for tracker in self.player_trackers
+            if (team := tracker.metadata.get("team")) is not None
+        }
 
         # Check each team for Sage
         for team_name in teams:
@@ -407,7 +451,7 @@ class GameStateManager:
 
             log.debug(f"Team {team_name} has Sage: {has_sage}")
 
-    def _team_has_sage(self, team_name: str) -> bool:
+    def _team_has_sage(self, team_name: Optional[str]) -> bool:
         """
         Check if a team has a Sage agent (for revival validation).
 
@@ -419,10 +463,10 @@ class GameStateManager:
         Returns:
             True if the team has a Sage, False otherwise
         """
-        return self.team_has_sage_cache.get(team_name, False)
+        return self.team_has_sage_cache.get(team_name, False) if team_name is not None else False
 
     def _handle_phase_transition(
-        self, old_phase: Phase, new_phase: Phase, timestamp: float
+        self, old_phase: Optional[Phase], new_phase: Phase, timestamp: float
     ) -> None:
         """Handle phase transition events and state updates."""
         old_phase_name = old_phase.name if old_phase else "None"
@@ -433,7 +477,9 @@ class GameStateManager:
         # 1. After POST_ROUND (normal case - score change detected)
         # 2. After ACTIVE_ROUND (score detection failed, but round still ended)
         # 3. At the start of the game (old_phase is None)
-        if new_phase == Phase.PREROUND and (old_phase == Phase.POST_ROUND or old_phase == Phase.ACTIVE_ROUND or old_phase is None):
+        if new_phase == Phase.PREROUND and (
+            old_phase == Phase.POST_ROUND or old_phase == Phase.ACTIVE_ROUND or old_phase is None
+        ):
             # Increment round number for new round
             round_number = self.round_manager.start_new_round(timestamp)
 
@@ -465,24 +511,27 @@ class GameStateManager:
             if self.player_trackers is not None:
                 for tracker in self.player_trackers:
                     tracker.round_start_timestamp = timestamp
-                    # Force alive status (players start round alive, any prior "dead" status is stale)
+                    # Force alive status; any prior "dead" status is stale.
                     tracker.current_state["alive"] = True
                     tracker.previous_state["alive"] = True
-                    # Sync previous_state to current_state to prevent preround changes from firing events
-                    # (StateValidator is not called in preround, so transitions there shouldn't generate events)
+                    # Sync state to avoid events from preround transitions.
                     tracker.previous_state = tracker.current_state.copy()
                     log.debug(
-                        f"[STATE SYNC] Player {tracker.player_index} ({tracker.metadata.get('name')}): "
+                        f"[STATE SYNC] Player {tracker.player_index} "
+                        f"({tracker.metadata.get('name')}): "
                         f"Synced state at round start"
                     )
 
-            event = self._add_timers_to_event({
-                "type": "round_start",
-                "timestamp": timestamp,
-                "round_number": self.round_manager.current_round,
-                "score_team1": self.round_manager.current_score["team1"],
-                "score_team2": self.round_manager.current_score["team2"],
-            }, timestamp)
+            event = self._add_timers_to_event(
+                {
+                    "type": "round_start",
+                    "timestamp": timestamp,
+                    "round_number": self.round_manager.current_round,
+                    "score_team1": self.round_manager.current_score["team1"],
+                    "score_team2": self.round_manager.current_score["team2"],
+                },
+                timestamp,
+            )
             self.event_collector.add_event(event)
             log.info(f"Round {self.round_manager.current_round} started @ {timestamp:.2f}s")
 
@@ -490,12 +539,15 @@ class GameStateManager:
             if self.round_manager.current_round == 1 and not self.match_started:
                 team1_name = self.round_manager.team_names[0]
                 team2_name = self.round_manager.team_names[1]
-                match_start_event = self._add_timers_to_event({
-                    "type": "match_start",
-                    "timestamp": timestamp,
-                    "team1": team1_name,
-                    "team2": team2_name,
-                }, timestamp)
+                match_start_event = self._add_timers_to_event(
+                    {
+                        "type": "match_start",
+                        "timestamp": timestamp,
+                        "team1": team1_name,
+                        "team2": team2_name,
+                    },
+                    timestamp,
+                )
                 self.event_collector.add_event(match_start_event)
                 self.match_started = True
                 log.info(f"Match started: {team1_name} vs {team2_name} @ {timestamp:.2f}s")
@@ -504,7 +556,9 @@ class GameStateManager:
         # This happens either:
         # 1. After POST_ROUND (preround skipped)
         # 2. At the start of the game (old_phase is None, first round skipped preround)
-        elif new_phase == Phase.ACTIVE_ROUND and (old_phase == Phase.POST_ROUND or old_phase is None):
+        elif new_phase == Phase.ACTIVE_ROUND and (
+            old_phase == Phase.POST_ROUND or old_phase is None
+        ):
             # Increment round number (preround was skipped)
             round_number = self.round_manager.start_new_round(timestamp)
 
@@ -523,23 +577,32 @@ class GameStateManager:
             if self.player_trackers is not None:
                 for tracker in self.player_trackers:
                     tracker.round_start_timestamp = timestamp
-                    # Force alive status (players start round alive, any prior "dead" status is stale)
+                    # Force alive status; any prior "dead" status is stale.
                     tracker.current_state["alive"] = True
                     tracker.previous_state["alive"] = True
-                    log.debug(f"Player {tracker.player_index}: Grace period started, forced alive @ {timestamp:.2f}s")
+                    log.debug(
+                        f"Player {tracker.player_index}: Grace period started, "
+                        f"forced alive @ {timestamp:.2f}s"
+                    )
 
             # Round start event
-            event = self._add_timers_to_event({
-                "type": "round_start",
-                "timestamp": timestamp,
-                "round_number": round_number,
-                "score_team1": self.round_manager.current_score["team1"],
-                "score_team2": self.round_manager.current_score["team2"],
-            }, timestamp)
+            event = self._add_timers_to_event(
+                {
+                    "type": "round_start",
+                    "timestamp": timestamp,
+                    "round_number": round_number,
+                    "score_team1": self.round_manager.current_score["team1"],
+                    "score_team2": self.round_manager.current_score["team2"],
+                },
+                timestamp,
+            )
             self.event_collector.add_event(event)
 
             if old_phase is None:
-                log.info(f"Round {round_number} started (first round, skipped preround) @ {timestamp:.2f}s")
+                log.info(
+                    f"Round {round_number} started (first round, skipped preround) "
+                    f"@ {timestamp:.2f}s"
+                )
             else:
                 log.info(f"Round {round_number} started (skipped preround) @ {timestamp:.2f}s")
 
@@ -547,12 +610,15 @@ class GameStateManager:
             if round_number == 1 and not self.match_started:
                 team1_name = self.round_manager.team_names[0]
                 team2_name = self.round_manager.team_names[1]
-                match_start_event = self._add_timers_to_event({
-                    "type": "match_start",
-                    "timestamp": timestamp,
-                    "team1": team1_name,
-                    "team2": team2_name,
-                }, timestamp)
+                match_start_event = self._add_timers_to_event(
+                    {
+                        "type": "match_start",
+                        "timestamp": timestamp,
+                        "team1": team1_name,
+                        "team2": team2_name,
+                    },
+                    timestamp,
+                )
                 self.event_collector.add_event(match_start_event)
                 self.match_started = True
                 log.info(f"Match started: {team1_name} vs {team2_name} @ {timestamp:.2f}s")
@@ -561,12 +627,14 @@ class GameStateManager:
         """Process PREROUND phase - detect agents, abilities, ultimates."""
         # Only detect agents if player trackers not yet initialized
         if self.player_trackers is None:
-            agents_detected = []
-            sides_detected = []
+            agents_detected: list[Optional[str]] = []
+            sides_detected: list[Optional[str]] = []
 
             for player_idx in range(10):
                 # Detect agent
-                agent_info = self.detector_registry.preround_agent_detector.detect(frame, player_idx)
+                agent_info = self.detector_registry.preround_agent_detector.detect(
+                    frame, player_idx
+                )
 
                 if agent_info:
                     agents_detected.append(agent_info.agent_name)
@@ -579,12 +647,14 @@ class GameStateManager:
             if all(a is not None for a in agents_detected):
                 log.info(f"Detected all 10 agents in scoreboard order: {agents_detected}")
                 log.info(f"Detected sides: {sides_detected}")
-                self._initialize_player_trackers_from_agents(agents_detected, sides_detected)
+                valid_agents = cast(list[str], agents_detected)
+                valid_sides = cast(list[str], sides_detected)
+                self._initialize_player_trackers_from_agents(valid_agents, valid_sides)
                 # Reinitialize killfeed with detected agents
-                self.detector_registry.reinitialize_killfeed(agents_detected)
+                self.detector_registry.reinitialize_killfeed(valid_agents)
                 # Optimize agent detectors for future use (filter to only these 10 agents)
-                self.detector_registry.preround_agent_detector.set_agent_filter(agents_detected)
-                self.detector_registry.inround_agent_detector.set_agent_filter(agents_detected)
+                self.detector_registry.preround_agent_detector.set_agent_filter(valid_agents)
+                self.detector_registry.inround_agent_detector.set_agent_filter(valid_agents)
 
         # If player trackers are initialized, update abilities and ultimates
         # Map UI slot detections to actual player trackers based on agent detection
@@ -617,12 +687,16 @@ class GameStateManager:
                 slot_team_name = None
                 for tracker in self.player_trackers:
                     tracker_slot = tracker.player_index
-                    if (tracker_slot < 5 and slot_side == "left") or (tracker_slot >= 5 and slot_side == "right"):
+                    if (tracker_slot < 5 and slot_side == "left") or (
+                        tracker_slot >= 5 and slot_side == "right"
+                    ):
                         slot_team_name = tracker.metadata.get("team")
                         break
 
                 if not slot_team_name:
-                    log.warning(f"Preround slot {slot_idx}: Could not determine team for {slot_side} side")
+                    log.warning(
+                        f"Preround slot {slot_idx}: Could not determine team for {slot_side} side"
+                    )
                     continue
 
                 # Convert team name to team_key (team1/team2) for round manager lookup
@@ -641,8 +715,10 @@ class GameStateManager:
                 # Verify detected visual styling matches expected role for this slot's team
                 if detected_side != expected_side_for_slot:
                     log.warning(
-                        f"Preround slot {slot_idx}: Detected {detected_side} styling for agent {detected_agent}, "
-                        f"but expected {expected_side_for_slot} for {slot_team_name} ({slot_team_key})"
+                        f"Preround slot {slot_idx}: Detected {detected_side} styling "
+                        f"for agent {detected_agent}, "
+                        f"but expected {expected_side_for_slot} for "
+                        f"{slot_team_name} ({slot_team_key})"
                     )
                     continue
 
@@ -659,7 +735,8 @@ class GameStateManager:
 
                 if not matching_tracker:
                     log.warning(
-                        f"Preround slot {slot_idx}: Detected agent {detected_agent} ({detected_side}) "
+                        f"Preround slot {slot_idx}: Detected agent "
+                        f"{detected_agent} ({detected_side}) "
                         f"but could not find matching player tracker from {slot_team_name}"
                     )
                     continue
@@ -667,11 +744,13 @@ class GameStateManager:
                 # Step 3: Detect abilities and ultimate for this slot
                 # Note: In preround, ability charge increases are allowed (buying utility)
                 # so we don't validate transitions via StateValidator
-                detections = {}
+                detections: dict[str, Any] = {}
 
                 # Detect abilities - returns dict of ability_name -> AbilityInfo
-                ability_dict = self.detector_registry.preround_ability_detector.detect_player_abilities(
-                    frame, slot_idx, side
+                ability_dict = (
+                    self.detector_registry.preround_ability_detector.detect_player_abilities(
+                        frame, slot_idx, side
+                    )
                 )
                 if ability_dict:
                     for ability_name, ability_info in ability_dict.items():
@@ -685,10 +764,14 @@ class GameStateManager:
                 if ultimate_result is not None:
                     ultimate_info, _ = ultimate_result
                     detections["ultimate"] = ultimate_info
-                    if self.debug_player_filter is None or self.debug_player_filter == matching_tracker.player_index:
+                    if (
+                        self.debug_player_filter is None
+                        or self.debug_player_filter == matching_tracker.player_index
+                    ):
                         log.debug(
                             f"Preround slot {slot_idx} -> Player {matching_tracker.player_index} "
-                            f"ultimate = {ultimate_info.charges} charges (full: {ultimate_info.is_full})"
+                            f"ultimate = {ultimate_info.charges} charges "
+                            f"(full: {ultimate_info.is_full})"
                         )
 
                 # Step 4: Update the matched player tracker (no event generation in preround)
@@ -725,14 +808,18 @@ class GameStateManager:
                     # Convert winner from "team1"/"team2" to actual team name
                     winner_name = self.round_manager.team_names[0 if winner == "team1" else 1]
 
-                    event = self._add_timers_to_event({
-                        "type": "round_end",
-                        "timestamp": last_event_timestamp,
-                        "round_number": self.round_manager.current_round - 1,  # Previous round
-                        "winner": winner_name,
-                        "score_team1": new_score["team1"],
-                        "score_team2": new_score["team2"],
-                    }, timestamp, frame)
+                    event = self._add_timers_to_event(
+                        {
+                            "type": "round_end",
+                            "timestamp": last_event_timestamp,
+                            "round_number": self.round_manager.current_round - 1,  # Previous round
+                            "winner": winner_name,
+                            "score_team1": new_score["team1"],
+                            "score_team2": new_score["team2"],
+                        },
+                        timestamp,
+                        frame,
+                    )
                     self.event_collector.add_event(event)
 
                     # Update current score in round manager
@@ -740,7 +827,8 @@ class GameStateManager:
 
                     log.info(
                         f"PREROUND score change detected @ {timestamp:.2f}s: "
-                        f"{old_score['team1']}-{old_score['team2']} → {new_score['team1']}-{new_score['team2']} "
+                        f"{old_score['team1']}-{old_score['team2']} → "
+                        f"{new_score['team1']}-{new_score['team2']} "
                         f"(round {self.round_manager.current_round - 1} ended, {winner} wins, "
                         f"event timestamp: {last_event_timestamp:.2f}s)"
                     )
@@ -759,10 +847,14 @@ class GameStateManager:
         if spike_info and spike_info.spike_planted and self.timer_manager.spike_planted_at is None:
             # Spike just planted
             self.timer_manager.on_spike_planted(timestamp)
-            event = self._add_timers_to_event({
-                "type": "spike_plant",
-                "timestamp": timestamp,
-            }, timestamp, frame)
+            event = self._add_timers_to_event(
+                {
+                    "type": "spike_plant",
+                    "timestamp": timestamp,
+                },
+                timestamp,
+                frame,
+            )
             self.event_collector.add_event(event)
             log.info(f"Spike planted @ {timestamp:.2f}s")
 
@@ -791,7 +883,7 @@ class GameStateManager:
                 side = "left" if found_slot < 5 else "right"
 
                 # Gather all detections from this slot
-                detections = {}
+                detections: dict[str, Any] = {}
 
                 # Detect health
                 health = self.detector_registry.health_detector.detect(frame, found_slot, side)
@@ -803,8 +895,10 @@ class GameStateManager:
                     detections["armor"] = armor
 
                 # Detect abilities
-                ability_dict = self.detector_registry.inround_ability_detector.detect_player_abilities(
-                    frame, found_slot, side
+                ability_dict = (
+                    self.detector_registry.inround_ability_detector.detect_player_abilities(
+                        frame, found_slot, side
+                    )
                 )
                 if ability_dict:
                     for ability_name, ability_info in ability_dict.items():
@@ -823,9 +917,13 @@ class GameStateManager:
                 player_tracker.update(detections, timestamp)
 
                 # Debug logging
-                if self.debug_player_filter is None or self.debug_player_filter == player_tracker.player_index:
+                if (
+                    self.debug_player_filter is None
+                    or self.debug_player_filter == player_tracker.player_index
+                ):
                     log.debug(
-                        f"Player {player_tracker.player_index} ({player_tracker.metadata.get('name')}) "
+                        f"Player {player_tracker.player_index} "
+                        f"({player_tracker.metadata.get('name')}) "
                         f"found in slot {found_slot}, detections: {detections}"
                     )
             else:
@@ -840,22 +938,28 @@ class GameStateManager:
                 # Mark as dead if icon missing for threshold frames (but NOT during grace period)
                 if player_tracker.frames_icon_missing >= 2 and not in_grace_period:
                     log.info(
-                        f"Player {player_tracker.player_index} ({player_tracker.metadata.get('name')}) "
-                        f"agent icon disappeared for {player_tracker.frames_icon_missing} frames → marking as dead"
+                        f"Player {player_tracker.player_index} "
+                        f"({player_tracker.metadata.get('name')}) "
+                        f"agent icon disappeared for {player_tracker.frames_icon_missing} "
+                        "frames → marking as dead"
                     )
                     # Update with None health to trigger death detection
                     player_tracker.update({"health": None}, timestamp)
 
             # Check for state changes and generate events
             if player_tracker.is_death_transition():
-                event = self._add_timers_to_event({
-                    "type": "death",
-                    "timestamp": timestamp,
-                    "player": player_tracker.metadata.get("name"),
-                    "team": player_tracker.metadata.get("team"),
-                    "agent": player_tracker.metadata.get("agent"),
-                    "player_index": player_tracker.player_index,
-                }, timestamp, frame)
+                event = self._add_timers_to_event(
+                    {
+                        "type": "death",
+                        "timestamp": timestamp,
+                        "player": player_tracker.metadata.get("name"),
+                        "team": player_tracker.metadata.get("team"),
+                        "agent": player_tracker.metadata.get("agent"),
+                        "player_index": player_tracker.player_index,
+                    },
+                    timestamp,
+                    frame,
+                )
                 self.event_collector.add_event(event)
 
             # Validate state changes for ability/ultimate events
@@ -876,18 +980,22 @@ class GameStateManager:
 
         # Detect killfeed - returns ALL candidate combinations tagged with entry index
         # Format: list of (entry_idx, KillfeedAgentDetection)
-        killfeed_candidates = self.detector_registry.killfeed_detector.detect(frame)
+        killfeed_candidates = cast(
+            list[tuple[int, KillfeedAgentDetection]],
+            self.detector_registry.killfeed_detector.detect(frame),
+        )
 
         # Log all candidates before validation
         if killfeed_candidates:
             log.debug(f"Killfeed candidates @ {timestamp:.2f}s:")
-            victim_counts = {}
+            victim_counts: dict[str, int] = {}
             for entry_idx, candidate in killfeed_candidates:
                 victim_key = f"{candidate.victim_agent} ({candidate.victim_side})"
                 victim_counts[victim_key] = victim_counts.get(victim_key, 0) + 1
                 log.debug(
                     f"  Entry {entry_idx}: {candidate.killer_agent} ({candidate.killer_side}) -> "
-                    f"{candidate.victim_agent} ({candidate.victim_side}) [conf: {candidate.confidence:.3f}]"
+                    f"{candidate.victim_agent} ({candidate.victim_side}) "
+                    f"[conf: {candidate.confidence:.3f}]"
                 )
 
             # Warn if same victim appears in multiple candidates
@@ -928,14 +1036,16 @@ class GameStateManager:
                 valid_kills.append(candidate)
                 accepted_entries.add(entry_idx)
                 log.debug(
-                    f"Valid kill (entry {entry_idx}): {candidate.killer_agent} ({candidate.killer_side}) -> "
+                    f"Valid kill (entry {entry_idx}): "
+                    f"{candidate.killer_agent} ({candidate.killer_side}) -> "
                     f"{candidate.victim_agent} ({candidate.victim_side}) "
                     f"[conf: {candidate.confidence:.3f}]"
                 )
             else:
                 rejected_count += 1
                 log.debug(
-                    f"Rejected kill (entry {entry_idx}): {candidate.killer_agent} ({candidate.killer_side}) -> "
+                    f"Rejected kill (entry {entry_idx}): "
+                    f"{candidate.killer_agent} ({candidate.killer_side}) -> "
                     f"{candidate.victim_agent} ({candidate.victim_side}) "
                     f"[conf: {candidate.confidence:.3f}]"
                 )
@@ -949,7 +1059,9 @@ class GameStateManager:
         # Get timers for this frame (calculate once for all kills)
         timer_info = self.detector_registry.timer_detector.detect(frame)
         game_timer = timer_info.time_seconds if timer_info else None
-        timers = self.timer_manager.get_timers(timestamp, self.current_phase, game_timer)
+        timers = self.timer_manager.get_timers(
+            timestamp, self.current_phase or Phase.NON_GAME, game_timer
+        )
 
         for kill_detection in valid_kills:
             # Find killer and victim players
@@ -987,9 +1099,13 @@ class GameStateManager:
                 for idx, tracker in enumerate(self.player_trackers):
                     state = tracker.current_state
                     log.debug(
-                        f"Player {idx} ({tracker.metadata.get('name', '?'):12s} - {tracker.metadata.get('agent', '?'):10s}): "
-                        f"alive={state['alive']:5} | hp={str(state['health']):>3} | armor={str(state['armor']):>3} | "
-                        f"ab1={str(state['ability_1']):>4} ab2={str(state['ability_2']):>4} ab3={str(state['ability_3']):>4} | "
+                        f"Player {idx} ({tracker.metadata.get('name', '?'):12s} - "
+                        f"{tracker.metadata.get('agent', '?'):10s}): "
+                        f"alive={state['alive']:5} | hp={str(state['health']):>3} | "
+                        f"armor={str(state['armor']):>3} | "
+                        f"ab1={str(state['ability_1']):>4} "
+                        f"ab2={str(state['ability_2']):>4} "
+                        f"ab3={str(state['ability_3']):>4} | "
                         f"ult={state['ultimate']}"
                     )
             else:
@@ -998,9 +1114,14 @@ class GameStateManager:
                 tracker = self.player_trackers[self.debug_player_filter]
                 state = tracker.current_state
                 log.debug(
-                    f"Player {self.debug_player_filter} ({tracker.metadata.get('name', '?'):12s} - {tracker.metadata.get('agent', '?'):10s}): "
-                    f"alive={state['alive']:5} | hp={str(state['health']):>3} | armor={str(state['armor']):>3} | "
-                    f"ab1={str(state['ability_1']):>4} ab2={str(state['ability_2']):>4} ab3={str(state['ability_3']):>4} | "
+                    f"Player {self.debug_player_filter} "
+                    f"({tracker.metadata.get('name', '?'):12s} - "
+                    f"{tracker.metadata.get('agent', '?'):10s}): "
+                    f"alive={state['alive']:5} | hp={str(state['health']):>3} | "
+                    f"armor={str(state['armor']):>3} | "
+                    f"ab1={str(state['ability_1']):>4} "
+                    f"ab2={str(state['ability_2']):>4} "
+                    f"ab3={str(state['ability_3']):>4} | "
                     f"ult={state['ultimate']}"
                 )
             log.debug("=" * 80)
@@ -1017,7 +1138,7 @@ class GameStateManager:
         # Detect score from scoreboard and infer winner
         # Note: We add the round_end event at the END to ensure it fires after all other events
         score_info = phase_detections.get("score")
-        round_end_data = None  # Store round end info to add later
+        round_end_data: Optional[dict[str, Any]] = None  # Store round end info to add later
 
         if score_info:
             new_score = {
@@ -1069,7 +1190,7 @@ class GameStateManager:
                 side = "left" if found_slot < 5 else "right"
 
                 # Gather all detections from this slot
-                detections = {}
+                detections: dict[str, Any] = {}
 
                 # Detect health
                 health = self.detector_registry.health_detector.detect(frame, found_slot, side)
@@ -1081,8 +1202,10 @@ class GameStateManager:
                     detections["armor"] = armor
 
                 # Detect abilities
-                ability_dict = self.detector_registry.inround_ability_detector.detect_player_abilities(
-                    frame, found_slot, side
+                ability_dict = (
+                    self.detector_registry.inround_ability_detector.detect_player_abilities(
+                        frame, found_slot, side
+                    )
                 )
                 if ability_dict:
                     for ability_name, ability_info in ability_dict.items():
@@ -1101,9 +1224,13 @@ class GameStateManager:
                 player_tracker.update(detections, timestamp)
 
                 # Debug logging
-                if self.debug_player_filter is None or self.debug_player_filter == player_tracker.player_index:
+                if (
+                    self.debug_player_filter is None
+                    or self.debug_player_filter == player_tracker.player_index
+                ):
                     log.debug(
-                        f"Player {player_tracker.player_index} ({player_tracker.metadata.get('name')}) "
+                        f"Player {player_tracker.player_index} "
+                        f"({player_tracker.metadata.get('name')}) "
                         f"found in slot {found_slot}, detections: {detections}"
                     )
             else:
@@ -1118,22 +1245,28 @@ class GameStateManager:
                 # Mark as dead if icon missing for threshold frames (but NOT during grace period)
                 if player_tracker.frames_icon_missing >= 2 and not in_grace_period:
                     log.info(
-                        f"Player {player_tracker.player_index} ({player_tracker.metadata.get('name')}) "
-                        f"agent icon disappeared for {player_tracker.frames_icon_missing} frames → marking as dead"
+                        f"Player {player_tracker.player_index} "
+                        f"({player_tracker.metadata.get('name')}) "
+                        f"agent icon disappeared for {player_tracker.frames_icon_missing} "
+                        "frames → marking as dead"
                     )
                     # Update with None health to trigger death detection
                     player_tracker.update({"health": None}, timestamp)
 
             # Check for death transition and fire event
             if player_tracker.is_death_transition():
-                event = self._add_timers_to_event({
-                    "type": "death",
-                    "timestamp": timestamp,
-                    "player": player_tracker.metadata.get("name"),
-                    "team": player_tracker.metadata.get("team"),
-                    "agent": player_tracker.metadata.get("agent"),
-                    "player_index": player_tracker.player_index,
-                }, timestamp, frame)
+                event = self._add_timers_to_event(
+                    {
+                        "type": "death",
+                        "timestamp": timestamp,
+                        "player": player_tracker.metadata.get("name"),
+                        "team": player_tracker.metadata.get("team"),
+                        "agent": player_tracker.metadata.get("agent"),
+                        "player_index": player_tracker.player_index,
+                    },
+                    timestamp,
+                    frame,
+                )
                 self.event_collector.add_event(event)
 
             # Validate state changes for ability/ultimate events
@@ -1154,18 +1287,22 @@ class GameStateManager:
 
         # Detect killfeed - returns ALL candidate combinations tagged with entry index
         # Format: list of (entry_idx, KillfeedAgentDetection)
-        killfeed_candidates = self.detector_registry.killfeed_detector.detect(frame)
+        killfeed_candidates = cast(
+            list[tuple[int, KillfeedAgentDetection]],
+            self.detector_registry.killfeed_detector.detect(frame),
+        )
 
         # Log all candidates before validation
         if killfeed_candidates:
             log.debug(f"Killfeed candidates @ {timestamp:.2f}s:")
-            victim_counts = {}
+            victim_counts: dict[str, int] = {}
             for entry_idx, candidate in killfeed_candidates:
                 victim_key = f"{candidate.victim_agent} ({candidate.victim_side})"
                 victim_counts[victim_key] = victim_counts.get(victim_key, 0) + 1
                 log.debug(
                     f"  Entry {entry_idx}: {candidate.killer_agent} ({candidate.killer_side}) -> "
-                    f"{candidate.victim_agent} ({candidate.victim_side}) [conf: {candidate.confidence:.3f}]"
+                    f"{candidate.victim_agent} ({candidate.victim_side}) "
+                    f"[conf: {candidate.confidence:.3f}]"
                 )
 
             # Warn if same victim appears in multiple candidates
@@ -1206,14 +1343,16 @@ class GameStateManager:
                 valid_kills.append(candidate)
                 accepted_entries.add(entry_idx)
                 log.debug(
-                    f"Valid kill (entry {entry_idx}): {candidate.killer_agent} ({candidate.killer_side}) -> "
+                    f"Valid kill (entry {entry_idx}): "
+                    f"{candidate.killer_agent} ({candidate.killer_side}) -> "
                     f"{candidate.victim_agent} ({candidate.victim_side}) "
                     f"[conf: {candidate.confidence:.3f}]"
                 )
             else:
                 rejected_count += 1
                 log.debug(
-                    f"Rejected kill (entry {entry_idx}): {candidate.killer_agent} ({candidate.killer_side}) -> "
+                    f"Rejected kill (entry {entry_idx}): "
+                    f"{candidate.killer_agent} ({candidate.killer_side}) -> "
                     f"{candidate.victim_agent} ({candidate.victim_side}) "
                     f"[conf: {candidate.confidence:.3f}]"
                 )
@@ -1227,7 +1366,9 @@ class GameStateManager:
         # Get timers for this frame (calculate once for all kills)
         timer_info = self.detector_registry.timer_detector.detect(frame)
         game_timer = timer_info.time_seconds if timer_info else None
-        timers = self.timer_manager.get_timers(timestamp, self.current_phase, game_timer)
+        timers = self.timer_manager.get_timers(
+            timestamp, self.current_phase or Phase.NON_GAME, game_timer
+        )
 
         for kill_detection in valid_kills:
             # Find killer and victim players
@@ -1265,9 +1406,13 @@ class GameStateManager:
                 for idx, tracker in enumerate(self.player_trackers):
                     state = tracker.current_state
                     log.debug(
-                        f"Player {idx} ({tracker.metadata.get('name', '?'):12s} - {tracker.metadata.get('agent', '?'):10s}): "
-                        f"alive={state['alive']:5} | hp={str(state['health']):>3} | armor={str(state['armor']):>3} | "
-                        f"ab1={str(state['ability_1']):>4} ab2={str(state['ability_2']):>4} ab3={str(state['ability_3']):>4} | "
+                        f"Player {idx} ({tracker.metadata.get('name', '?'):12s} - "
+                        f"{tracker.metadata.get('agent', '?'):10s}): "
+                        f"alive={state['alive']:5} | hp={str(state['health']):>3} | "
+                        f"armor={str(state['armor']):>3} | "
+                        f"ab1={str(state['ability_1']):>4} "
+                        f"ab2={str(state['ability_2']):>4} "
+                        f"ab3={str(state['ability_3']):>4} | "
                         f"ult={state['ultimate']}"
                     )
             else:
@@ -1276,9 +1421,14 @@ class GameStateManager:
                 tracker = self.player_trackers[self.debug_player_filter]
                 state = tracker.current_state
                 log.debug(
-                    f"Player {self.debug_player_filter} ({tracker.metadata.get('name', '?'):12s} - {tracker.metadata.get('agent', '?'):10s}): "
-                    f"alive={state['alive']:5} | hp={str(state['health']):>3} | armor={str(state['armor']):>3} | "
-                    f"ab1={str(state['ability_1']):>4} ab2={str(state['ability_2']):>4} ab3={str(state['ability_3']):>4} | "
+                    f"Player {self.debug_player_filter} "
+                    f"({tracker.metadata.get('name', '?'):12s} - "
+                    f"{tracker.metadata.get('agent', '?'):10s}): "
+                    f"alive={state['alive']:5} | hp={str(state['health']):>3} | "
+                    f"armor={str(state['armor']):>3} | "
+                    f"ab1={str(state['ability_1']):>4} "
+                    f"ab2={str(state['ability_2']):>4} "
+                    f"ab3={str(state['ability_3']):>4} | "
                     f"ult={state['ultimate']}"
                 )
             log.debug("=" * 80)
@@ -1289,14 +1439,18 @@ class GameStateManager:
             winner_key = round_end_data["winner"]  # "team1" or "team2"
             winner_name = self.round_manager.team_names[0 if winner_key == "team1" else 1]
 
-            event = self._add_timers_to_event({
-                "type": "round_end",
-                "timestamp": timestamp,
-                "round_number": round_end_data["round_number"],
-                "winner": winner_name,
-                "score_team1": round_end_data["score"]["team1"],
-                "score_team2": round_end_data["score"]["team2"],
-            }, timestamp, frame)
+            event = self._add_timers_to_event(
+                {
+                    "type": "round_end",
+                    "timestamp": timestamp,
+                    "round_number": round_end_data["round_number"],
+                    "winner": winner_name,
+                    "score_team1": round_end_data["score"]["team1"],
+                    "score_team2": round_end_data["score"]["team2"],
+                },
+                timestamp,
+                frame,
+            )
             self.event_collector.add_event(event)
 
             # Check if match has ended (one team won)
@@ -1313,15 +1467,19 @@ class GameStateManager:
                 else:
                     match_winner = self.round_manager.team_names[1]
 
-                match_end_event = self._add_timers_to_event({
-                    "type": "match_end",
-                    "timestamp": timestamp,
-                    "winner": match_winner,
-                    "final_score_team1": score_team1,
-                    "final_score_team2": score_team2,
-                    "team1": self.round_manager.team_names[0],
-                    "team2": self.round_manager.team_names[1],
-                }, timestamp, frame)
+                match_end_event = self._add_timers_to_event(
+                    {
+                        "type": "match_end",
+                        "timestamp": timestamp,
+                        "winner": match_winner,
+                        "final_score_team1": score_team1,
+                        "final_score_team2": score_team2,
+                        "team1": self.round_manager.team_names[0],
+                        "team2": self.round_manager.team_names[1],
+                    },
+                    timestamp,
+                    frame,
+                )
                 self.event_collector.add_event(match_end_event)
                 self.match_ended = True
                 log.info(
@@ -1369,13 +1527,17 @@ class GameStateManager:
             )
 
             if detected_agent == player_agent:
-                log.debug(f"Player {player_tracker.player_index} found in slot {slot_idx} via greyscale")
+                log.debug(
+                    f"Player {player_tracker.player_index} found in slot {slot_idx} via greyscale"
+                )
                 return slot_idx
 
         # Not found - log what was detected for debugging
         log.warning(
-            f"Could not find {player_agent} for player {player_tracker.player_index} ({player_tracker.metadata.get('name')}). "
-            f"Detected in slots {slots_to_search.start}-{slots_to_search.stop-1}: {detected_agents}"
+            f"Could not find {player_agent} for player {player_tracker.player_index} "
+            f"({player_tracker.metadata.get('name')}). "
+            f"Detected in slots {slots_to_search.start}-{slots_to_search.stop - 1}: "
+            f"{detected_agents}"
         )
 
         return None
@@ -1470,7 +1632,8 @@ class GameStateManager:
             victim_player.current_state["killer"] = kill_detection.killer_agent
             log.info(
                 f"Marked {kill_detection.victim_agent} ({kill_detection.victim_side}) as "
-                f"killed by {kill_detection.killer_agent} (player_index={victim_player.player_index})"
+                f"killed by {kill_detection.killer_agent} "
+                f"(player_index={victim_player.player_index})"
             )
         else:
             log.warning(
@@ -1502,7 +1665,8 @@ class GameStateManager:
         # Get current sides for both teams
         current_sides = self.round_manager.get_current_sides()
 
-        for tracker in self.player_trackers:
+        trackers = cast(list[PlayerStateTracker], self.player_trackers)
+        for tracker in trackers:
             agent = tracker.metadata.get("agent")
             if not agent:
                 continue
@@ -1562,7 +1726,8 @@ class GameStateManager:
         if kill_detection.killer_side == kill_detection.victim_side:
             log.debug(
                 f"Kill validation failed: Killer and victim on same side "
-                f"({kill_detection.killer_agent} -> {kill_detection.victim_agent}, both {kill_detection.killer_side})"
+                f"({kill_detection.killer_agent} -> {kill_detection.victim_agent}, "
+                f"both {kill_detection.killer_side})"
             )
             return False
 
@@ -1583,21 +1748,25 @@ class GameStateManager:
             # Check if victim is dead (not alive or no health detected)
             if victim_alive:
                 log.debug(
-                    f"Victim validation failed: {kill_detection.victim_agent} ({kill_detection.victim_side}) "
-                    f"player_index={victim_player.player_index} is marked alive (health: {victim_health})"
+                    f"Victim validation failed: {kill_detection.victim_agent} "
+                    f"({kill_detection.victim_side}) "
+                    f"player_index={victim_player.player_index} is marked alive "
+                    f"(health: {victim_health})"
                 )
                 return False
 
             # Check if victim already has a killer (can only be killed once per round)
             if victim_killer is not None:
                 log.debug(
-                    f"Victim validation failed: {kill_detection.victim_agent} ({kill_detection.victim_side}) "
+                    f"Victim validation failed: {kill_detection.victim_agent} "
+                    f"({kill_detection.victim_side}) "
                     f"player_index={victim_player.player_index} already killed by {victim_killer}"
                 )
                 return False
         else:
             log.debug(
-                f"Victim validation warning: Could not find player with agent {kill_detection.victim_agent} "
+                f"Victim validation warning: Could not find player with agent "
+                f"{kill_detection.victim_agent} "
                 f"on {kill_detection.victim_side} side"
             )
 
@@ -1631,24 +1800,31 @@ class GameStateManager:
         game_timer = timer_info.time_seconds if timer_info else None
 
         # Get all timer values
-        timers = self.timer_manager.get_timers(timestamp, self.current_phase, game_timer)
+        timers = self.timer_manager.get_timers(
+            timestamp, self.current_phase or Phase.NON_GAME, game_timer
+        )
 
         # Collect player states (or empty list if not initialized)
         player_states = []
         if self.player_trackers is not None:
             for tracker in self.player_trackers:
-                player_states.append({
-                    "metadata": tracker.metadata,
-                    "current_state": tracker.current_state,
-                })
+                player_states.append(
+                    {
+                        "metadata": tracker.metadata,
+                        "current_state": tracker.current_state,
+                    }
+                )
 
         # Write to CSV
         self.output_writer.write_frame_state(
             timestamp=timestamp,
             frame_number=self.frame_count,
-            phase=self.current_phase,
+            phase=self.current_phase or Phase.NON_GAME,
             round_number=self.round_manager.current_round,
-            scores=(self.round_manager.current_score["team1"], self.round_manager.current_score["team2"]),
+            scores=(
+                self.round_manager.current_score["team1"],
+                self.round_manager.current_score["team2"],
+            ),
             player_states=player_states,
             timers=timers,
         )
@@ -1700,8 +1876,7 @@ class GameStateManager:
                 score_team2 += 1  # Increment winner's score
             else:
                 log.error(
-                    f"Cannot infer round winner: scores are tied at "
-                    f"{score_team1}-{score_team2}"
+                    f"Cannot infer round winner: scores are tied at {score_team1}-{score_team2}"
                 )
                 return
 
@@ -1720,7 +1895,7 @@ class GameStateManager:
                     "game_timer": None,
                     "spike_timer": None,
                     "post_round_timer": None,
-                }
+                },
             }
             self.event_collector.add_event(round_end_event)
             log.info(
@@ -1759,7 +1934,7 @@ class GameStateManager:
                         "game_timer": None,
                         "spike_timer": None,
                         "post_round_timer": None,
-                    }
+                    },
                 }
                 self.event_collector.add_event(match_end_event)
                 self.match_ended = True
@@ -1778,7 +1953,8 @@ class GameStateManager:
             f"[{timestamp:7.2f}s] Frame {self.frame_count:5d} | "
             f"Phase: {phase_name:12s} | "
             f"Round {self.round_manager.current_round:2d} | "
-            f"Score: {self.round_manager.current_score['team1']}-{self.round_manager.current_score['team2']}"
+            f"Score: {self.round_manager.current_score['team1']}-"
+            f"{self.round_manager.current_score['team2']}"
         )
 
     def __repr__(self) -> str:

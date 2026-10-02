@@ -1,0 +1,155 @@
+{
+  "schema_version": "1.0",
+  "analysis_kind": "single_round_evidence_inventory",
+  "match_id": "synthetic-match",
+  "map_id": "ascent",
+  "round_id": "synthetic-match-map1-round4",
+  "round_number": 4,
+  "sample_round_count": 1,
+  "events_by_source": {
+    "synthetic-hud-export": 3
+  },
+  "source_artifacts": {
+    "synthetic-hud-export": "event_log.jsonl"
+  },
+  "source_clock_domains": {
+    "synthetic-hud-export": "synthetic_vod_seconds"
+  },
+  "source_bounds_references": {
+    "synthetic-hud-export": "synthetic fixture bounds, not reviewed production evidence"
+  },
+  "observations": [
+    {
+      "schema_version": "1.0",
+      "fact_id": "fact-1",
+      "text": "The HUD event log recorded event type round_start; upstream evidence not_provided.",
+      "event_type": "round_start",
+      "source_id": "synthetic-hud-export",
+      "source_line_number": 1,
+      "timestamp": 120.0,
+      "clock_domain": "synthetic_vod_seconds",
+      "evidence_id": "synthetic-hud-export:line:1",
+      "upstream_confidence": null,
+      "confidence_availability": "not_provided",
+      "upstream_evidence": [],
+      "evidence_availability": "not_provided",
+      "evidence_reference_count": 0
+    },
+    {
+      "schema_version": "1.0",
+      "fact_id": "fact-2",
+      "text": "The HUD event log recorded event type spike_plant; upstream evidence not_provided.",
+      "event_type": "spike_plant",
+      "source_id": "synthetic-hud-export",
+      "source_line_number": 2,
+      "timestamp": 154.25,
+      "clock_domain": "synthetic_vod_seconds",
+      "evidence_id": "synthetic-hud-export:line:2",
+      "upstream_confidence": null,
+      "confidence_availability": "not_provided",
+      "upstream_evidence": [],
+      "evidence_availability": "not_provided",
+      "evidence_reference_count": 0
+    },
+    {
+      "schema_version": "1.0",
+      "fact_id": "fact-3",
+      "text": "The HUD event log recorded event type round_end; upstream evidence not_provided.",
+      "event_type": "round_end",
+      "source_id": "synthetic-hud-export",
+      "source_line_number": 3,
+      "timestamp": 179.5,
+      "clock_domain": "synthetic_vod_seconds",
+      "evidence_id": "synthetic-hud-export:line:3",
+      "upstream_confidence": null,
+      "confidence_availability": "not_provided",
+      "upstream_evidence": [],
+      "evidence_availability": "not_provided",
+      "evidence_reference_count": 0
+    }
+  ],
+  "selected_observation_ids": [
+    "fact-1",
+    "fact-2",
+    "fact-3"
+  ],
+  "interpretations": [
+    {
+      "schema_version": "1.0",
+      "text": "In this synthetic example, the recorded plant follows the round-start event.",
+      "confidence": 0.55,
+      "fact_ids": [
+        "fact-1",
+        "fact-2"
+      ],
+      "citations": [
+        {
+          "schema_version": "1.0",
+          "fact_id": "fact-1",
+          "evidence_id": "synthetic-hud-export:line:1",
+          "source_id": "synthetic-hud-export",
+          "source_line_number": 1,
+          "timestamp": 120.0,
+          "clock_domain": "synthetic_vod_seconds"
+        },
+        {
+          "schema_version": "1.0",
+          "fact_id": "fact-2",
+          "evidence_id": "synthetic-hud-export:line:2",
+          "source_id": "synthetic-hud-export",
+          "source_line_number": 2,
+          "timestamp": 154.25,
+          "clock_domain": "synthetic_vod_seconds"
+        }
+      ]
+    }
+  ],
+  "recommendations": [
+    {
+      "schema_version": "1.0",
+      "text": "As a review exercise, compare this timing with additional reviewed rounds.",
+      "confidence": 0.61,
+      "fact_ids": [
+        "fact-1",
+        "fact-2",
+        "fact-3"
+      ],
+      "citations": [
+        {
+          "schema_version": "1.0",
+          "fact_id": "fact-1",
+          "evidence_id": "synthetic-hud-export:line:1",
+          "source_id": "synthetic-hud-export",
+          "source_line_number": 1,
+          "timestamp": 120.0,
+          "clock_domain": "synthetic_vod_seconds"
+        },
+        {
+          "schema_version": "1.0",
+          "fact_id": "fact-2",
+          "evidence_id": "synthetic-hud-export:line:2",
+          "source_id": "synthetic-hud-export",
+          "source_line_number": 2,
+          "timestamp": 154.25,
+          "clock_domain": "synthetic_vod_seconds"
+        },
+        {
+          "schema_version": "1.0",
+          "fact_id": "fact-3",
+          "evidence_id": "synthetic-hud-export:line:3",
+          "source_id": "synthetic-hud-export",
+          "source_line_number": 3,
+          "timestamp": 179.5,
+          "clock_domain": "synthetic_vod_seconds"
+        }
+      ]
+    }
+  ],
+  "diagnostics": [],
+  "limitations": [
+    "One round cannot establish recurring habits or anti-strat patterns.",
+    "Legacy HUD event logs lack calibrated event confidence; detection accuracy is not independently verified.",
+    "Claim citations confirm reference membership only, not semantic support or causality.",
+    "Model-reported confidence is subjective and is not calibrated."
+  ]
+}

@@ -1,10 +1,12 @@
 """Unit tests for pre-round ability detector."""
 
 from __future__ import annotations
+
 from unittest.mock import Mock
-import pytest
-import numpy as np
+
 import cv2
+import numpy as np
+import pytest
 
 from valoscribe.detectors.preround_ability_detector import PreroundAbilityDetector
 from valoscribe.types.detections import AbilityInfo
@@ -222,7 +224,9 @@ class TestPreroundAbilityDetector:
         ]
 
         frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
-        result = detector.detect_ability(frame, player_index=5, ability_name="ability_1", side="right")
+        result = detector.detect_ability(
+            frame, player_index=5, ability_name="ability_1", side="right"
+        )
 
         assert result is not None
         assert result.charges == 2
@@ -265,7 +269,9 @@ class TestPreroundAbilityDetector:
         mock_cropper.crop_player_info_preround.return_value = [
             {
                 "side": "left",
-                "ability_1": cv2.cvtColor(self.create_blob_image(1, blob_size=8), cv2.COLOR_GRAY2BGR),
+                "ability_1": cv2.cvtColor(
+                    self.create_blob_image(1, blob_size=8), cv2.COLOR_GRAY2BGR
+                ),
                 # ability_2 and ability_3 missing
             }
         ]
@@ -303,7 +309,8 @@ class TestPreroundAbilityDetector:
 
         # Low threshold should detect, high threshold should not
         assert result_low is not None
-        assert result_low.charges >= 1 or result_low.charges == 0  # May or may not detect depending on threshold
+        # Detection may or may not occur depending on the threshold.
+        assert result_low.charges >= 1 or result_low.charges == 0
 
         assert result_high is not None
         assert result_high.charges == 0  # Should not detect

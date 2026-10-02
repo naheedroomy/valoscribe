@@ -1,11 +1,11 @@
 """Unit tests for PlayerStateTracker."""
 
 from __future__ import annotations
-from unittest.mock import Mock
+
 import pytest
 
 from valoscribe.orchestration.player_state_tracker import PlayerStateTracker
-from valoscribe.types.detections import HealthInfo, ArmorInfo, AbilityInfo, UltimateInfo
+from valoscribe.types.detections import AbilityInfo, ArmorInfo, HealthInfo, UltimateInfo
 
 
 class TestPlayerStateTracker:
@@ -126,19 +126,42 @@ class TestPlayerStateTracker:
         assert tracker.current_state["alive"] is True
         assert tracker.revival_candidate_count == 0
 
-    def test_revival_reset_on_detection_failure(self, tracker):
-        """Test that revival tracking resets when detection fails."""
+    def test_revival_candidate_survives_missing_health_field(self, tracker):
+        """Missing health data is uncertainty, not evidence that revival failed."""
         # Start dead
         tracker.current_state["alive"] = False
         tracker.previous_state["alive"] = False
 
-        # First alive detection
         detections = {"health": HealthInfo(health=100, confidence=0.9, raw_text="100")}
         tracker.update(detections, timestamp=10.0)
         assert tracker.revival_candidate_count == 1
 
-        # Detection fails (no health)
+        # An omitted health key means no health observation was made.
         tracker.update({}, timestamp=11.0)
+        assert tracker.current_state["alive"] is False
+        assert tracker.revival_candidate_count == 1
+        assert tracker.revival_first_detection_timestamp == 10.0
+
+        # Revival still needs consecutive positive detections; missing data
+        # cannot resurrect the player.
+        tracker.update(detections, timestamp=12.0)
+        assert tracker.current_state["alive"] is False
+        assert tracker.revival_candidate_count == 2
+        tracker.update(detections, timestamp=13.0)
+        assert tracker.current_state["alive"] is True
+
+    def test_revival_candidate_resets_on_explicit_missing_health(self, tracker):
+        """An explicit failed health observation breaks consecutive evidence."""
+        tracker.current_state["alive"] = False
+        tracker.previous_state["alive"] = False
+
+        detections = {"health": HealthInfo(health=100, confidence=0.9, raw_text="100")}
+        tracker.update(detections, timestamp=10.0)
+        assert tracker.revival_candidate_count == 1
+
+        # None is an explicit failed health detection, unlike an omitted key.
+        tracker.update({"health": None}, timestamp=11.0)
+        assert tracker.current_state["alive"] is False
         assert tracker.revival_candidate_count == 0
         assert tracker.revival_first_detection_timestamp is None
 

@@ -6,8 +6,9 @@ Matches against attack and defense templates to identify both agent and side.
 """
 
 from __future__ import annotations
-from typing import Optional
+
 from pathlib import Path
+from typing import Any, Optional
 
 import cv2
 import numpy as np
@@ -61,7 +62,7 @@ class TemplateAgentDetector:
             f"templates: {len(self.templates)}, method: {match_method})"
         )
 
-    def _load_templates(self) -> dict[str, dict]:
+    def _load_templates(self) -> dict[str, dict[str, Any]]:
         """
         Load agent templates from attack and defense directories.
 
@@ -76,7 +77,7 @@ class TemplateAgentDetector:
                 "agent_name_defense": {"image": ndarray, "agent": "agent_name", "side": "defense"},
             }
         """
-        templates = {}
+        templates: dict[str, dict[str, Any]] = {}
 
         if not self.template_dir.exists():
             log.warning(f"Template directory does not exist: {self.template_dir}")
@@ -165,9 +166,7 @@ class TemplateAgentDetector:
             f"(agents: {sorted(agent_set)})"
         )
 
-    def detect(
-        self, frame: np.ndarray, player_index: int
-    ) -> Optional[AgentInfo]:
+    def detect(self, frame: np.ndarray, player_index: int) -> Optional[AgentInfo]:
         """
         Detect agent for a specific player using template matching.
 
@@ -187,14 +186,16 @@ class TemplateAgentDetector:
         preround_crops = self.cropper.crop_player_info_preround(frame)
 
         if player_index >= len(preround_crops):
-            log.warning(f"Player index {player_index} out of range (max: {len(preround_crops) - 1})")
+            log.warning(
+                f"Player index {player_index} out of range (max: {len(preround_crops) - 1})"
+            )
             return None
 
         player_crop_data = preround_crops[player_index]
 
         # Get agent crop
         if "agent_icon" not in player_crop_data:
-            log.warning(f"Agent icon region not found in player crop data")
+            log.warning("Agent icon region not found in player crop data")
             return None
 
         agent_crop = player_crop_data["agent_icon"]
@@ -212,9 +213,7 @@ class TemplateAgentDetector:
 
         agent_name, side, confidence = best_match
 
-        log.debug(
-            f"Player {player_index}: {agent_name} ({side}) with confidence {confidence:.2f}"
-        )
+        log.debug(f"Player {player_index}: {agent_name} ({side}) with confidence {confidence:.2f}")
 
         return AgentInfo(
             agent_name=agent_name,
@@ -222,9 +221,7 @@ class TemplateAgentDetector:
             confidence=confidence,
         )
 
-    def _match_all_templates(
-        self, crop: np.ndarray
-    ) -> Optional[tuple[str, str, float]]:
+    def _match_all_templates(self, crop: np.ndarray) -> Optional[tuple[str, str, float]]:
         """
         Match all agent templates against a crop and return the best match.
 
@@ -238,8 +235,8 @@ class TemplateAgentDetector:
         preprocessed = self._preprocess_crop(crop)
 
         best_confidence = 0.0
-        best_agent = None
-        best_side = None
+        best_agent: Optional[str] = None
+        best_side: Optional[str] = None
 
         # Try matching each template
         for template_key, template_data in self.templates.items():
@@ -248,7 +245,10 @@ class TemplateAgentDetector:
             side = template_data["side"]
 
             # Skip if template is larger than crop (can't match)
-            if template_img.shape[0] > preprocessed.shape[0] or template_img.shape[1] > preprocessed.shape[1]:
+            if (
+                template_img.shape[0] > preprocessed.shape[0]
+                or template_img.shape[1] > preprocessed.shape[1]
+            ):
                 log.debug(
                     f"Template {template_key} ({template_img.shape[:2]}) larger than crop "
                     f"({preprocessed.shape[:2]}), skipping"
@@ -280,6 +280,9 @@ class TemplateAgentDetector:
             log.debug(
                 f"Best match confidence {best_confidence:.2f} below threshold {self.min_confidence}"
             )
+            return None
+
+        if best_agent is None or best_side is None:
             return None
 
         return best_agent, best_side, best_confidence
@@ -323,7 +326,7 @@ class TemplateAgentDetector:
             Tuple of (AgentInfo or None, agent_crop, debug_info)
             debug_info contains match scores for all templates
         """
-        debug_info = {"error": None}
+        debug_info: dict[str, Any] = {"error": None}
 
         # Get preround crops
         preround_crops = self.cropper.crop_player_info_preround(frame)
@@ -338,7 +341,10 @@ class TemplateAgentDetector:
         debug_info["crop_keys"] = list(player_crop_data.keys())
 
         if "agent_icon" not in player_crop_data:
-            debug_info["error"] = f"'agent_icon' key not in crop_data. Available keys: {list(player_crop_data.keys())}"
+            debug_info["error"] = (
+                "'agent_icon' key not in crop_data. Available keys: "
+                f"{list(player_crop_data.keys())}"
+            )
             return None, np.array([]), debug_info
 
         agent_crop = player_crop_data["agent_icon"]
@@ -352,12 +358,15 @@ class TemplateAgentDetector:
         preprocessed = self._preprocess_crop(agent_crop)
 
         # Get match scores for all templates
-        match_scores = {}
+        match_scores: dict[str, dict[str, Any]] = {}
         for template_key, template_data in self.templates.items():
             template_img = template_data["image"]
 
             # Skip if template is larger than crop
-            if template_img.shape[0] > preprocessed.shape[0] or template_img.shape[1] > preprocessed.shape[1]:
+            if (
+                template_img.shape[0] > preprocessed.shape[0]
+                or template_img.shape[1] > preprocessed.shape[1]
+            ):
                 match_scores[template_key] = {
                     "agent": template_data["agent"],
                     "side": template_data["side"],

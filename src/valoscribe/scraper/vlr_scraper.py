@@ -6,13 +6,33 @@ from VLR.gg match pages for Valorant esports analysis.
 """
 
 from __future__ import annotations
-from typing import Optional
-from urllib.parse import urlparse
 
-import requests
-from bs4 import BeautifulSoup
+from collections.abc import Callable
+from importlib import import_module
+from typing import Optional, Protocol, cast
+
+from bs4 import BeautifulSoup, Tag
 
 from valoscribe.utils.logger import get_logger
+
+
+class _Response(Protocol):
+    text: str
+
+    def raise_for_status(self) -> None: ...
+
+
+class _Session(Protocol):
+    headers: dict[str, str]
+
+    def get(self, url: str, *, timeout: int) -> _Response: ...
+
+
+class _Requests(Protocol):
+    Session: Callable[[], _Session]
+
+
+requests = cast(_Requests, import_module("requests"))
 
 log = get_logger(__name__)
 
@@ -60,7 +80,10 @@ class VLRScraper:
                         "map_number": int,
                         "map_name": str,
                         "vod_url": str,
-                        "starting_sides": {"team1": "attack"|"defense", "team2": "attack"|"defense"},
+                        "starting_sides": {
+                            "team1": "attack"|"defense",
+                            "team2": "attack"|"defense",
+                        },
                         "players": [
                             {"name": str, "team": str, "agent": str},
                             ...  # 10 players total
@@ -77,11 +100,6 @@ class VLRScraper:
             log.warning("URL doesn't have game=all parameter, adding it")
             separator = '&' if '?' in match_url else '?'
             match_url = f"{match_url}{separator}game=all&tab=overview"
-
-        # Extract base URL
-        parsed_url = urlparse(match_url)
-        base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"
-        match_path = parsed_url.path
 
         # Fetch the main match page with game=all
         response = self.session.get(match_url, timeout=self.timeout)
@@ -131,7 +149,9 @@ class VLRScraper:
             "maps": maps,
         }
 
-    def _extract_team_names(self, soup: BeautifulSoup) -> tuple[list[str], list[str]]:
+    def _extract_team_names(
+        self, soup: BeautifulSoup
+    ) -> tuple[list[str], list[Optional[str]]]:
         """
         Extract team names and logo URLs from match page header.
 
@@ -153,10 +173,8 @@ class VLRScraper:
 
                 # Extract logo URL for matching
                 logo_img = link.find('img')
-                if logo_img and logo_img.get('src'):
-                    logos.append(logo_img['src'])
-                else:
-                    logos.append(None)
+                logo_src = logo_img.get("src") if logo_img else None
+                logos.append(logo_src if isinstance(logo_src, str) else None)
 
         # Fallback: try to find team names in game header
         if len(teams) < 2:
@@ -179,7 +197,7 @@ class VLRScraper:
 
         Returns list of YouTube URLs for each map.
         """
-        vod_urls = []
+        vod_urls: list[str] = []
 
         # Find the match streams/VODs section
         streams_section = soup.find('div', class_='match-streams-bets-container')
@@ -189,13 +207,17 @@ class VLRScraper:
             links = streams_section.find_all('a', href=True)
 
             for link in links:
-                href = link['href']
+                href = link.get("href")
                 link_text = link.get_text(strip=True).lower()
 
                 # Look for "Map 1", "Map 2", etc.
-                if 'map ' in link_text and link_text != 'map':
-                    if 'youtube.com' in href or 'youtu.be' in href:
-                        vod_urls.append(href)
+                if (
+                    isinstance(href, str)
+                    and 'map ' in link_text
+                    and link_text != 'map'
+                    and ('youtube.com' in href or 'youtu.be' in href)
+                ):
+                    vod_urls.append(href)
 
         return vod_urls
 
@@ -217,7 +239,8 @@ class VLRScraper:
             map_items = nav.find_all('div', class_='vm-stats-gamesnav-item')
 
             for item in map_items:
-                game_id = item.get('data-game-id')
+                game_id_value = item.get('data-game-id')
+                game_id = game_id_value if isinstance(game_id_value, str) else None
 
                 # Skip "All Maps" item
                 if game_id == 'all':
@@ -243,7 +266,7 @@ class VLRScraper:
         map_name: str,
         vod_url: Optional[str],
         teams: list[str],
-        team_logos: list[str],
+        team_logos: list[Optional[str]],
         container_index: int,
     ) -> Optional[dict]:
         """
@@ -306,7 +329,9 @@ class VLRScraper:
             log.error(f"Failed to extract map {map_number} data: {e}")
             return None
 
-    def _extract_players(self, soup: BeautifulSoup, teams: list[str], container_index: int) -> list[dict]:
+    def _extract_players(
+        self, soup: BeautifulSoup, teams: list[str], container_index: int
+    ) -> list[dict[str, str]]:
         """
         Extract player information from team stat tables for a specific map.
 
@@ -358,7 +383,11 @@ class VLRScraper:
                 player_link = player_cell.find('a')
                 if player_link:
                     # Find the div with font-weight: 700 (player name)
-                    name_div = player_link.find('div', style=lambda s: s and 'font-weight: 700' in s)
+                    name_div = player_link.find(
+                        'div',
+                        style=lambda style: isinstance(style, str)
+                        and 'font-weight: 700' in style,
+                    )
                     if name_div:
                         player_name = name_div.get_text(strip=True)
                     else:
@@ -373,7 +402,10 @@ class VLRScraper:
                 agent_img = agent_cell.find('img')
 
                 if agent_img and agent_img.get('title'):
-                    agent_name = agent_img['title'].lower()
+                    agent_title = agent_img.get("title")
+                    if not isinstance(agent_title, str):
+                        continue
+                    agent_name = agent_title.lower()
 
                     players.append({
                         "name": player_name,
@@ -386,7 +418,11 @@ class VLRScraper:
         return players
 
     def _extract_starting_sides(
-        self, soup: BeautifulSoup, teams: list[str], team_logos: list[str], container_index: int
+        self,
+        soup: BeautifulSoup,
+        teams: list[str],
+        team_logos: list[Optional[str]],
+        container_index: int
     ) -> dict:
         """
         Extract starting sides from the first round in the timeline.
@@ -445,27 +481,33 @@ class VLRScraper:
             return {"team1": "attack", "team2": "defense"}
 
         # Get team logo URLs from the timeline (top and bottom)
-        top_team_logo = None
-        bottom_team_logo = None
+        top_team_logo: Optional[str] = None
+        bottom_team_logo: Optional[str] = None
         top_team_name = team_divs[0].get_text(strip=True)
         bottom_team_name = team_divs[1].get_text(strip=True)
 
         top_img = team_divs[0].find('img')
-        if top_img and top_img.get('src'):
-            top_team_logo = top_img['src']
+        top_src = top_img.get("src") if top_img else None
+        if isinstance(top_src, str):
+            top_team_logo = top_src
 
         bottom_img = team_divs[1].find('img')
-        if bottom_img and bottom_img.get('src'):
-            bottom_team_logo = bottom_img['src']
+        bottom_src = bottom_img.get("src") if bottom_img else None
+        if isinstance(bottom_src, str):
+            bottom_team_logo = bottom_src
 
-        log.debug(f"Timeline teams - Top: {top_team_name} (logo: {top_team_logo}), Bottom: {bottom_team_name} (logo: {bottom_team_logo})")
+        log.debug(
+            f"Timeline teams - Top: {top_team_name} (logo: {top_team_logo}), "
+            f"Bottom: {bottom_team_name} (logo: {bottom_team_logo})"
+        )
 
         # Find the first round column with a title attribute
         # Look specifically for "Round 1" in the title
-        first_round = None
-        first_round_title = None
+        first_round: Optional[Tag] = None
+        first_round_title: Optional[str] = None
         for child in children[1:]:  # Skip first child (team names)
-            title = child.get('title')
+            title_value = child.get('title')
+            title = title_value if isinstance(title_value, str) else None
             if title:
                 # Check if this is specifically Round 1
                 if 'Round 1' in title or title.startswith('Round 1'):
@@ -496,7 +538,14 @@ class VLRScraper:
         winning_side = None  # 'attack' or 'defense'
 
         for i, rnd_sq in enumerate(rnd_sqs[:2]):
-            classes = rnd_sq.get('class', [])
+            class_value: object = rnd_sq.get('class')
+            classes = (
+                set(class_value.split())
+                if isinstance(class_value, str)
+                else set(class_value)
+                if isinstance(class_value, list)
+                else set()
+            )
 
             if 'mod-win' in classes:
                 winning_team_position = i
@@ -535,13 +584,20 @@ class VLRScraper:
         result = {}
         if winning_team_logo and winning_team_logo == team_logos[0]:
             result = {"team1": winning_side, "team2": losing_side}
-            log.info(f"Starting sides: {teams[0]} (team1) = {winning_side}, {teams[1]} (team2) = {losing_side}")
+            log.info(
+                f"Starting sides: {teams[0]} (team1) = {winning_side}, "
+                f"{teams[1]} (team2) = {losing_side}"
+            )
         elif winning_team_logo and winning_team_logo == team_logos[1]:
             result = {"team1": losing_side, "team2": winning_side}
-            log.info(f"Starting sides: {teams[0]} (team1) = {losing_side}, {teams[1]} (team2) = {winning_side}")
+            log.info(
+                f"Starting sides: {teams[0]} (team1) = {losing_side}, "
+                f"{teams[1]} (team2) = {winning_side}"
+            )
         else:
             log.warning(
-                f"Could not match winning team logo '{winning_team_logo}' to team logos {team_logos}, "
+                f"Could not match winning team logo '{winning_team_logo}' "
+                f"to team logos {team_logos}, "
                 f"using default sides (may be incorrect!)"
             )
             result = {"team1": "attack", "team2": "defense"}

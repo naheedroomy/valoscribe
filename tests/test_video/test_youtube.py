@@ -1,12 +1,13 @@
 """Unit tests for YouTube downloader module."""
 
 from __future__ import annotations
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock
+
+from unittest.mock import MagicMock, Mock, patch
+
 import pytest
 
-from valoscribe.video.youtube import download_youtube, _TqdmProgressHook
 from valoscribe.types.video import DownloadResult
+from valoscribe.video.youtube import _TqdmProgressHook, download_youtube
 
 
 class TestDownloadYoutube:
@@ -102,7 +103,7 @@ class TestDownloadYoutube:
         mock_ydl.prepare_filename.return_value = str(existing_file)
 
         # Execute
-        result = download_youtube(
+        download_youtube(
             url="https://youtube.com/watch?v=abc123",
             out_dir=temp_output_dir,
             overwrite=True,
@@ -130,7 +131,7 @@ class TestDownloadYoutube:
         expected_path.touch()  # Create with correct extension
 
         # Execute with custom parameters
-        result = download_youtube(
+        download_youtube(
             url="https://youtube.com/watch?v=abc123",
             out_dir=temp_output_dir,
             prefer_height=720,
@@ -142,7 +143,9 @@ class TestDownloadYoutube:
         # Assert: Check that YoutubeDL was configured with correct format string
         # YoutubeDL is called twice: once for probe, once for download
         # Download call has 'format' key in options
-        assert len(mock_ydl_class.call_args_list) >= 2, "Expected at least 2 YoutubeDL instantiations"
+        assert len(mock_ydl_class.call_args_list) >= 2, (
+            "Expected at least 2 YoutubeDL instantiations"
+        )
 
         # Find the call with 'format' in the options dict
         download_call_opts = None
@@ -159,7 +162,9 @@ class TestDownloadYoutube:
         assert "ext=mkv" in format_str
 
     @patch("valoscribe.video.youtube.YoutubeDL")
-    def test_download_with_progress_callback(self, mock_ydl_class, mock_video_info, temp_output_dir):
+    def test_download_with_progress_callback(
+        self, mock_ydl_class, mock_video_info, temp_output_dir
+    ):
         """Test that custom progress callback is registered."""
         # Setup
         mock_ydl = MagicMock()
@@ -175,7 +180,7 @@ class TestDownloadYoutube:
         custom_callback = Mock()
 
         # Execute
-        result = download_youtube(
+        download_youtube(
             url="https://youtube.com/watch?v=abc123",
             out_dir=temp_output_dir,
             on_progress=custom_callback,
@@ -195,14 +200,17 @@ class TestDownloadYoutube:
         assert len(progress_hooks) == 2  # _TqdmProgressHook + custom callback
 
     @patch("valoscribe.video.youtube.YoutubeDL")
-    def test_missing_file_after_download_raises_error(self, mock_ydl_class, mock_video_info, temp_output_dir):
+    def test_missing_file_after_download_raises_error(
+        self, mock_ydl_class, mock_video_info, temp_output_dir
+    ):
         """Test that RuntimeError is raised if downloaded file doesn't exist."""
         # Setup: Don't create the file after download
         mock_ydl = MagicMock()
         mock_ydl_class.return_value.__enter__.return_value = mock_ydl
         mock_ydl.extract_info.return_value = mock_video_info
 
-        nonexistent_path = temp_output_dir / f"{mock_video_info['title']}-{mock_video_info['id']}.mp4"
+        filename = f"{mock_video_info['title']}-{mock_video_info['id']}.mp4"
+        nonexistent_path = temp_output_dir / filename
         mock_ydl.prepare_filename.return_value = str(nonexistent_path)
 
         temp_output_dir.mkdir(parents=True)
@@ -216,7 +224,9 @@ class TestDownloadYoutube:
             )
 
     @patch("valoscribe.video.youtube.YoutubeDL")
-    def test_output_directory_created_if_missing(self, mock_ydl_class, mock_video_info, temp_output_dir):
+    def test_output_directory_created_if_missing(
+        self, mock_ydl_class, mock_video_info, temp_output_dir
+    ):
         """Test that output directory is created if it doesn't exist."""
         # Setup
         mock_ydl = MagicMock()

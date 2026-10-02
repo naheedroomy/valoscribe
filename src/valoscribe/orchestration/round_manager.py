@@ -1,6 +1,7 @@
 """Round and score tracking for game state orchestration."""
 
 from __future__ import annotations
+
 from typing import Optional
 
 from valoscribe.utils.logger import get_logger
@@ -45,7 +46,9 @@ class RoundManager:
                 }
         """
         # Extract team names (team1 = index 0, team2 = index 1)
-        self.team_names = [team["name"] for team in vlr_metadata["teams"]]
+        self.team_names: list[str] = [
+            team["name"] for team in vlr_metadata["teams"]
+        ]
 
         # Extract starting sides
         self.starting_sides = {

@@ -1,6 +1,7 @@
 """Unit tests for EventCollector."""
 
 from __future__ import annotations
+
 import pytest
 
 from valoscribe.orchestration.event_collector import EventCollector

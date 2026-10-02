@@ -6,8 +6,9 @@ in the timer region when the spike is planted.
 """
 
 from __future__ import annotations
-from typing import Optional
+
 from pathlib import Path
+from typing import Optional
 
 import cv2
 import numpy as np

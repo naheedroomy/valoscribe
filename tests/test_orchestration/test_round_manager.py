@@ -1,6 +1,7 @@
 """Unit tests for RoundManager."""
 
 from __future__ import annotations
+
 import pytest
 
 from valoscribe.orchestration.round_manager import RoundManager

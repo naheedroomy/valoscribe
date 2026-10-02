@@ -1,10 +1,12 @@
 """Unit tests for blob-based ability detector."""
 
 from __future__ import annotations
+
 from unittest.mock import Mock
-import pytest
-import numpy as np
+
 import cv2
+import numpy as np
+import pytest
 
 from valoscribe.detectors.ability_detector import AbilityDetector
 from valoscribe.types.detections import AbilityInfo

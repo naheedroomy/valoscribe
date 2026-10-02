@@ -5,8 +5,9 @@ Uses template matching to detect player health values from the scoreboard.
 """
 
 from __future__ import annotations
-from typing import Optional
+
 from pathlib import Path
+from typing import Any, Optional
 
 import cv2
 import numpy as np
@@ -69,7 +70,7 @@ class TemplateHealthDetector:
         Returns:
             Dictionary mapping digit strings to template images
         """
-        templates = {}
+        templates: dict[str, np.ndarray] = {}
 
         if not self.template_dir.exists():
             log.warning(f"Template directory does not exist: {self.template_dir}")
@@ -137,7 +138,7 @@ class TemplateHealthDetector:
 
         # Get health crop
         if "health" not in player_crop_data:
-            log.warning(f"Health region not found in player crop data")
+            log.warning("Health region not found in player crop data")
             return None
 
         health_crop = player_crop_data["health"]
@@ -204,7 +205,9 @@ class TemplateHealthDetector:
         if len(filtered_matches) > 3:
             log.warning(f"Too many digits detected ({len(filtered_matches)}), keeping best 3")
             # Keep the 3 highest confidence matches
-            filtered_matches = sorted(filtered_matches, key=lambda m: m["confidence"], reverse=True)[:3]
+            filtered_matches = sorted(
+                filtered_matches, key=lambda m: m["confidence"], reverse=True
+            )[:3]
             # Re-sort by position after keeping top 3
             filtered_matches.sort(key=lambda m: m["x"])
 
@@ -288,7 +291,7 @@ class TemplateHealthDetector:
         # Sort by confidence (descending)
         sorted_matches = sorted(matches, key=lambda m: m["confidence"], reverse=True)
 
-        filtered = []
+        filtered: list[dict[str, Any]] = []
 
         for match in sorted_matches:
             # Check if this match overlaps with any already accepted match

@@ -1,9 +1,10 @@
 """Player state tracking for game state orchestration."""
 
 from __future__ import annotations
-from typing import Optional
-from pathlib import Path
+
 import json
+from pathlib import Path
+from typing import Any, Optional, cast
 
 from valoscribe.utils.logger import get_logger
 
@@ -30,9 +31,14 @@ class PlayerStateTracker:
     ROUND_START_GRACE_PERIOD = 2.0
 
     # Class-level agent config cache (shared across all trackers)
-    _agent_config_cache: Optional[dict] = None
+    _agent_config_cache: Optional[dict[str, Any]] = None
 
-    def __init__(self, player_index: int, metadata: Optional[dict] = None, config_path: Optional[Path] = None):
+    def __init__(
+        self,
+        player_index: int,
+        metadata: Optional[dict[str, Any]] = None,
+        config_path: Optional[Path] = None,
+    ):
         """
         Initialize player state tracker.
 
@@ -61,7 +67,7 @@ class PlayerStateTracker:
             PlayerStateTracker._agent_config_cache = self._load_agent_config(config_path)
 
         # Current state
-        self.current_state = {
+        self.current_state: dict[str, Any] = {
             "alive": True,  # Assume alive at start
             "health": None,  # None = not detected yet
             "armor": None,
@@ -69,7 +75,7 @@ class PlayerStateTracker:
             "ability_2": None,
             "ability_3": None,
             "ultimate": None,  # Ultimate charges/full status
-            "killer": None,  # Agent name of killer (set when killed, cleared on revival/round reset)
+            "killer": None,  # Killer agent; cleared on revival or round reset.
         }
 
         # Previous state (for detecting transitions)
@@ -111,7 +117,7 @@ class PlayerStateTracker:
                 config = json.load(f)
                 agents_config = config.get("agents", {})
                 log.debug(f"Loaded agent config from {config_path} ({len(agents_config)} agents)")
-                return agents_config
+                return cast(dict[str, Any], agents_config)
         except Exception as e:
             log.warning(f"Failed to load agent config from {config_path}: {e}")
             return {}
@@ -233,14 +239,15 @@ class PlayerStateTracker:
             # Skip death detection during grace period (UI fade-in at round start)
             in_grace_period = False
             if self.round_start_timestamp is not None:
-                time_since_round_start = timestamp - self.round_start_timestamp
+                round_start_timestamp = self.round_start_timestamp
+                time_since_round_start = timestamp - round_start_timestamp
                 in_grace_period = time_since_round_start < self.ROUND_START_GRACE_PERIOD
 
             if in_grace_period:
                 # During grace period, don't detect deaths (UI may be fading in)
                 log.debug(
                     f"Player {self.player_index}: In grace period "
-                    f"({timestamp - self.round_start_timestamp:.1f}s < {self.ROUND_START_GRACE_PERIOD}s), "
+                    f"({time_since_round_start:.1f}s < {self.ROUND_START_GRACE_PERIOD}s), "
                     f"skipping death detection"
                 )
                 # Reset death candidate count during grace period
@@ -288,7 +295,10 @@ class PlayerStateTracker:
         player_name = self.metadata.get("name", f"Player{self.player_index}")
 
         # Get agent config
-        if not PlayerStateTracker._agent_config_cache or agent_name not in PlayerStateTracker._agent_config_cache:
+        if (
+            not PlayerStateTracker._agent_config_cache
+            or agent_name not in PlayerStateTracker._agent_config_cache
+        ):
             # No config available - accept the detection (can't validate)
             self.current_state[ability_key] = detected_charges
             return
@@ -322,8 +332,9 @@ class PlayerStateTracker:
         if prev_charges is not None and detected_charges > prev_charges:
             if not rechargeable:
                 log.warning(
-                    f"[ABILITY VALIDATION] {player_name} ({agent_name}): {ability_name} is not rechargeable "
-                    f"but charges increased {prev_charges}→{detected_charges}. Rejecting misdetection."
+                    f"[ABILITY VALIDATION] {player_name} ({agent_name}): "
+                    f"{ability_name} is not rechargeable but charges increased "
+                    f"{prev_charges}→{detected_charges}. Rejecting misdetection."
                 )
                 # Don't update state - keep previous value
                 return
@@ -364,11 +375,15 @@ class PlayerStateTracker:
 
     def is_alive_transition(self) -> bool:
         """Check if player transitioned from dead to alive."""
-        return not self.previous_state["alive"] and self.current_state["alive"]
+        return bool(
+            not self.previous_state["alive"] and self.current_state["alive"]
+        )
 
     def is_death_transition(self) -> bool:
         """Check if player transitioned from alive to dead."""
-        return self.previous_state["alive"] and not self.current_state["alive"]
+        return bool(
+            self.previous_state["alive"] and not self.current_state["alive"]
+        )
 
     def reset_for_new_round(self) -> None:
         """

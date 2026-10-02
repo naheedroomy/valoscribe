@@ -1,6 +1,5 @@
 """Tests for YouTube timestamp parsing."""
 
-import pytest
 from valoscribe.video.youtube import _parse_timestamp
 
 

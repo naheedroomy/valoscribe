@@ -6,14 +6,18 @@ from various CV detectors (OCR, ability detection, etc.).
 """
 
 from __future__ import annotations
+
 from typing import Optional
+
 from pydantic import BaseModel, Field
 
 
 class RoundInfo(BaseModel):
     """Information about the current round."""
 
-    round_number: int = Field(..., ge=1, le=100, description="Round number (1-24 regular, 25+ overtime)")
+    round_number: int = Field(
+        ..., ge=1, le=100, description="Round number (1-24 regular, 25+ overtime)"
+    )
     confidence: float = Field(..., ge=0.0, le=1.0, description="Detection confidence (0-1)")
     raw_text: Optional[str] = Field(None, description="Raw OCR text before parsing")
 
@@ -21,8 +25,12 @@ class RoundInfo(BaseModel):
 class ScoreInfo(BaseModel):
     """Information about team scores."""
 
-    team1_score: int = Field(..., ge=0, le=99, description="Team 1 score (0-13 regular, higher in overtime)")
-    team2_score: int = Field(..., ge=0, le=99, description="Team 2 score (0-13 regular, higher in overtime)")
+    team1_score: int = Field(
+        ..., ge=0, le=99, description="Team 1 score (0-13 regular, higher in overtime)"
+    )
+    team2_score: int = Field(
+        ..., ge=0, le=99, description="Team 2 score (0-13 regular, higher in overtime)"
+    )
     confidence: float = Field(..., ge=0.0, le=1.0, description="Detection confidence (0-1)")
     team1_raw_text: Optional[str] = Field(None, description="Raw OCR text for team 1")
     team2_raw_text: Optional[str] = Field(None, description="Raw OCR text for team 2")
@@ -46,7 +54,9 @@ class SpikeInfo(BaseModel):
 class AbilityInfo(BaseModel):
     """Information about ability charges."""
 
-    charges: int = Field(..., ge=0, le=10, description="Number of charges available (0 = on cooldown)")
+    charges: int = Field(
+        ..., ge=0, le=10, description="Number of charges available (0 = on cooldown)"
+    )
     total_blobs_detected: int = Field(..., ge=0, description="Total blobs found before filtering")
 
 

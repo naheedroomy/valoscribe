@@ -5,13 +5,14 @@ Wrapper around UltimateDetector that uses pre-round player info regions.
 """
 
 from __future__ import annotations
+
 from typing import Optional
 
 import cv2
 import numpy as np
 
-from valoscribe.detectors.ultimate_detector import UltimateDetector
 from valoscribe.detectors.cropper import Cropper
+from valoscribe.detectors.ultimate_detector import UltimateDetector
 from valoscribe.types.detections import UltimateInfo
 from valoscribe.utils.logger import get_logger
 
@@ -103,7 +104,7 @@ class PreroundUltimateDetector(UltimateDetector):
 
         # Get ultimate crop
         if "ultimate" not in player_crop_data:
-            log.warning(f"Ultimate region not found in player crop data")
+            log.warning("Ultimate region not found in player crop data")
             return None
 
         ultimate_crop = player_crop_data["ultimate"]
@@ -117,8 +118,8 @@ class PreroundUltimateDetector(UltimateDetector):
 
         # Mask out center icon
         h, w = preprocessed.shape
-        center = (w // 2, h // 2)
-        cv2.circle(preprocessed, center, self.center_mask_radius, 0, -1)
+        center: tuple[int, int] = (w // 2, h // 2)
+        cv2.circle(preprocessed, center, self.center_mask_radius, (0,), -1)
 
         # Create ring mask
         ring_mask = self._create_ring_mask(preprocessed.shape, center)
@@ -134,11 +135,13 @@ class PreroundUltimateDetector(UltimateDetector):
         # Check if full
         if white_pixel_ratio >= self.fullness_threshold:
             log.debug(
-                f"Player {player_index} ultimate is FULL (pre-round, white pixel ratio: {white_pixel_ratio:.2f})"
+                f"Player {player_index} ultimate is FULL (pre-round, "
+                f"white pixel ratio: {white_pixel_ratio:.2f})"
             )
             return (
                 UltimateInfo(
-                    # TODO: change this hardcoded 7 charges when full to the appropriate amount per agent
+                    # TODO: change this hardcoded 7 charges when full to the appropriate
+                    # amount per agent.
                     charges=7,  # Full ultimate = max charges
                     is_full=True,
                     total_blobs_detected=0,
@@ -204,16 +207,18 @@ class PreroundUltimateDetector(UltimateDetector):
 
         # Mask center
         h, w = preprocessed.shape
-        center = (w // 2, h // 2)
+        center: tuple[int, int] = (w // 2, h // 2)
         preprocessed_with_mask = preprocessed.copy()
-        cv2.circle(preprocessed_with_mask, center, self.center_mask_radius, 0, -1)
+        cv2.circle(preprocessed_with_mask, center, self.center_mask_radius, (0,), -1)
 
         # Create ring mask
         ring_mask = self._create_ring_mask(preprocessed.shape, center)
 
         # Calculate pixel density
         ring_pixels = preprocessed_with_mask[ring_mask > 0]
-        white_pixel_ratio = np.sum(ring_pixels == 255) / len(ring_pixels) if len(ring_pixels) > 0 else 0
+        white_pixel_ratio = (
+            np.sum(ring_pixels == 255) / len(ring_pixels) if len(ring_pixels) > 0 else 0
+        )
 
         # Count blobs
         masked = cv2.bitwise_and(preprocessed_with_mask, preprocessed_with_mask, mask=ring_mask)

@@ -1,9 +1,11 @@
 """Unit tests for round detector."""
 
 from __future__ import annotations
-from unittest.mock import Mock, MagicMock
-import pytest
+
+from unittest.mock import Mock
+
 import numpy as np
+import pytest
 
 from valoscribe.detectors.round_detector import RoundDetector
 from valoscribe.types.detections import RoundInfo
@@ -113,20 +115,30 @@ class TestRoundDetector:
 
         assert result is None
 
+    @pytest.mark.parametrize("round_number", [25, 100])
+    def test_detect_overtime_round(self, detector, mock_ocr_engine, round_number):
+        """Test detection accepts overtime rounds, including the upper bound."""
+        mock_ocr_engine.read_single_line.return_value = (f"ROUND {round_number}", 0.95)
+
+        result = detector.detect(np.zeros((1080, 1920, 3), dtype=np.uint8))
+
+        assert result is not None
+        assert result.round_number == round_number
+
     def test_detect_out_of_range_number(self, detector, mock_ocr_engine):
-        """Test detection with round number out of valid range."""
-        mock_ocr_engine.read_single_line.return_value = ("ROUND 30/24", 0.95)
+        """Test detection rejects round numbers above the supported maximum."""
+        mock_ocr_engine.read_single_line.return_value = ("ROUND 101/24", 0.95)
 
         frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
-        result = detector.detect(frame)
-
-        # 30 is out of range (max 24)
-        assert result is None
+        assert detector.detect(frame) is None
 
     def test_parse_round_number_various_formats(self, detector):
         """Test parsing round numbers from various formats."""
         test_cases = [
             ("ROUND 5/24", 5),
+            ("ROUND 25/24", 25),
+            ("100/24", 100),
+            ("ROUND 100", 100),
             ("5/24", 5),
             ("ROUND 12", 12),
             ("12", 12),
@@ -134,7 +146,7 @@ class TestRoundDetector:
             ("1/24", 1),
             ("24/24", 24),
             ("ROUND 0/24", None),  # Invalid: 0
-            ("ROUND 25/24", None),  # Invalid: > 24
+            ("ROUND 101/24", None),  # Invalid: > 100
             ("ROUND ABC/24", None),  # Invalid: non-numeric
             ("", None),  # Empty
             ("INVALID", None),  # No numbers
@@ -194,17 +206,19 @@ class TestRoundInfoValidation:
         assert info.raw_text == "ROUND 5/24"
 
     def test_round_number_range_validation(self):
-        """Test round number must be in valid range (1-24)."""
-        # Valid cases
+        """Test round number must be in valid range (1-100)."""
+        # Valid cases include overtime and the upper bound.
         RoundInfo(round_number=1, confidence=0.9)
         RoundInfo(round_number=24, confidence=0.9)
+        RoundInfo(round_number=25, confidence=0.9)
+        RoundInfo(round_number=100, confidence=0.9)
 
         # Invalid cases
         with pytest.raises(Exception):  # Pydantic ValidationError
             RoundInfo(round_number=0, confidence=0.9)
 
         with pytest.raises(Exception):
-            RoundInfo(round_number=25, confidence=0.9)
+            RoundInfo(round_number=101, confidence=0.9)
 
         with pytest.raises(Exception):
             RoundInfo(round_number=-5, confidence=0.9)

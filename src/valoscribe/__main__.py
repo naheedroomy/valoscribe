@@ -10,7 +10,16 @@ Organized command structure:
 
 import typer
 
-from valoscribe.commands import detect, extract, orchestrate, scrape, utils
+from valoscribe.commands import (
+    detect,
+    extract,
+    minimap,
+    orchestrate,
+    round_analysis,
+    scenario,
+    scrape,
+    utils,
+)
 
 app = typer.Typer(
     name="valoscribe",
@@ -23,6 +32,9 @@ app = typer.Typer(
 app.add_typer(detect.app, name="detect")
 app.add_typer(extract.app, name="extract")
 app.add_typer(orchestrate.app, name="orchestrate")
+app.add_typer(minimap.app, name="minimap")
+app.add_typer(scenario.app, name="scenario")
+app.add_typer(round_analysis.app, name="round-analysis")
 
 # Add utility commands at top level
 app.command()(utils.download)

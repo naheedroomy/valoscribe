@@ -1,18 +1,18 @@
 """Orchestration commands for full VOD processing."""
 
-import typer
 import json
 import logging
-from typing import Optional
 from pathlib import Path
+from typing import Optional
 
 import cv2
 import numpy as np
+import typer
 
 from valoscribe.orchestration.game_state_manager import GameStateManager
 from valoscribe.orchestration.phase_detector import Phase
-from valoscribe.video.reader import VideoReader
 from valoscribe.utils.logger import setup_logging
+from valoscribe.video.reader import VideoReader
 
 app = typer.Typer(help="Orchestration commands for full VOD processing")
 
@@ -108,8 +108,10 @@ def process_vod(
     Example:
         valoscribe orchestrate process-vod video.mp4 metadata.json --show --step
         valoscribe orchestrate process-vod video.mp4 metadata.json --quiet  # Only show events
-        valoscribe orchestrate process-vod video.mp4 metadata.json --show --show-prev-frame --step  # Debug with previous frame
-        valoscribe orchestrate process-vod video.mp4 metadata.json --debug-phase  # Show phase detection details
+        valoscribe orchestrate process-vod video.mp4 metadata.json --show --show-prev-frame --step
+            # Debug with previous frame
+        valoscribe orchestrate process-vod video.mp4 metadata.json --debug-phase
+            # Show phase detection details
     """
     setup_logging(level=logging.DEBUG if debug else logging.INFO)
 
@@ -151,14 +153,17 @@ def process_vod(
         raise typer.Exit(1)
 
     if not quiet:
-        typer.echo(f"Teams: {vlr_metadata['teams'][0]['name']} vs {vlr_metadata['teams'][1]['name']}")
+        typer.echo(
+            f"Teams: {vlr_metadata['teams'][0]['name']} vs "
+            f"{vlr_metadata['teams'][1]['name']}"
+        )
         typer.echo(f"Players: {len(vlr_metadata['players'])}")
         typer.echo(f"Map: {vlr_metadata.get('map', 'Unknown')}")
         typer.echo("")
 
     # Initialize GameStateManager
     if not quiet:
-        typer.echo(f"Initializing GameStateManager...")
+        typer.echo("Initializing GameStateManager...")
         typer.echo(f"  Video: {video_path}")
         typer.echo(f"  Output: {output_dir}")
         typer.echo(f"  FPS: {fps}")
@@ -220,7 +225,12 @@ def process_vod(
                         _print_event(event)
 
                     # Show previous frame if requested and available
-                    if show and show_prev_frame and previous_frame is not None:
+                    if (
+                        show
+                        and show_prev_frame
+                        and previous_frame is not None
+                        and manager.current_phase is not None
+                    ):
                         prev_display = _create_display_frame(
                             previous_frame,
                             timestamp - (1.0 / fps),  # Approximate previous timestamp
@@ -271,7 +281,8 @@ def process_vod(
                         f"[{timestamp:7.2f}s] Frame {manager.frame_count:5d} | "
                         f"Phase: {manager.current_phase.name:12s} | "
                         f"Round {manager.round_manager.current_round:2d} | "
-                        f"Score: {manager.round_manager.current_score['team1']}-{manager.round_manager.current_score['team2']}"
+                        f"Score: {manager.round_manager.current_score['team1']}-"
+                        f"{manager.round_manager.current_score['team2']}"
                     )
 
                 # Store current frame as previous for next iteration
@@ -309,29 +320,29 @@ def _print_event(event: dict) -> None:
     timestamp = event.get("timestamp", 0.0)
 
     # Color codes (if terminal supports it)
-    CYAN = "\033[96m"
-    GREEN = "\033[92m"
-    YELLOW = "\033[93m"
-    RED = "\033[91m"
-    RESET = "\033[0m"
+    cyan = "\033[96m"
+    green = "\033[92m"
+    yellow = "\033[93m"
+    red = "\033[91m"
+    reset = "\033[0m"
 
     # Format based on event type
     if event_type == "round_start":
         typer.echo(
-            f"{GREEN}[{timestamp:7.2f}s] ROUND START{RESET} | "
+            f"{green}[{timestamp:7.2f}s] ROUND START{reset} | "
             f"Round {event.get('round_number', '?')} | "
             f"Score: {event.get('score_team1', 0)}-{event.get('score_team2', 0)}"
         )
     elif event_type == "round_end":
         typer.echo(
-            f"{RED}[{timestamp:7.2f}s] ROUND END{RESET} | "
+            f"{red}[{timestamp:7.2f}s] ROUND END{reset} | "
             f"Round {event.get('round_number', '?')} | "
             f"Winner: {event.get('winner', '?')} | "
             f"Score: {event.get('score_team1', 0)}-{event.get('score_team2', 0)}"
         )
     elif event_type == "spike_plant":
         typer.echo(
-            f"{YELLOW}[{timestamp:7.2f}s] SPIKE PLANTED{RESET}"
+            f"{yellow}[{timestamp:7.2f}s] SPIKE PLANTED{reset}"
         )
     elif event_type == "kill":
         # Build killer string with name if available
@@ -357,7 +368,7 @@ def _print_event(event: dict) -> None:
             victim_str = f"{victim_agent} ({victim_side})"
 
         typer.echo(
-            f"{CYAN}[{timestamp:7.2f}s] KILL{RESET} | "
+            f"{cyan}[{timestamp:7.2f}s] KILL{reset} | "
             f"{killer_str} -> {victim_str}"
         )
     elif event_type == "death":
@@ -396,7 +407,10 @@ def _print_frame_data(
     typer.echo(f"\n--- Frame {frame_number} @ {timestamp:.3f}s ---")
     typer.echo(f"Phase: {phase.name}")
     typer.echo(f"Round: {round_manager.current_round}")
-    typer.echo(f"Score: {round_manager.current_score['team1']}-{round_manager.current_score['team2']}")
+    typer.echo(
+        f"Score: {round_manager.current_score['team1']}-"
+        f"{round_manager.current_score['team2']}"
+    )
 
     # Get timers
     timers = timer_manager.get_timers(timestamp, phase, None)
@@ -418,7 +432,7 @@ def _create_display_frame(
     timer_manager,
 ) -> np.ndarray:
     """Create display frame with overlay information."""
-    display = frame.copy()
+    display: np.ndarray = frame.copy()
 
     # Add overlay text
     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -456,7 +470,9 @@ def _create_display_frame(
 
     cv2.putText(
         display,
-        f"Round: {round_manager.current_round} | Score: {round_manager.current_score['team1']}-{round_manager.current_score['team2']}",
+        f"Round: {round_manager.current_round} | "
+        f"Score: {round_manager.current_score['team1']}-"
+        f"{round_manager.current_score['team2']}",
         (20, y_offset),
         font,
         0.6,

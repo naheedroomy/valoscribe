@@ -6,13 +6,14 @@ The presence of credits icons can be used to determine if a frame is in the pre-
 """
 
 from __future__ import annotations
-from typing import Optional
+
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 
-from valoscribe.detectors.template_credits_detector import TemplateCreditsDetector
 from valoscribe.detectors.cropper import Cropper
+from valoscribe.detectors.template_credits_detector import TemplateCreditsDetector
 from valoscribe.types.detections import CreditsInfo
 from valoscribe.utils.logger import get_logger
 
@@ -40,7 +41,7 @@ class PreroundCreditsDetector(TemplateCreditsDetector):
         Args:
             cropper: Cropper instance for extracting HUD regions
             template_path: Path to pre-round credits icon template
-                          If None, uses default: src/valoscribe/templates/credits/credits_icon_preround.png
+                          If None, uses default: `credits_icon_preround.png` in templates/credits.
             min_confidence: Minimum template match confidence (0-1)
             match_method: OpenCV template matching method
         """
@@ -97,7 +98,7 @@ class PreroundCreditsDetector(TemplateCreditsDetector):
 
         # Get credits crop
         if "credits" not in player_crop_data:
-            log.warning(f"Credits region not found in player crop data")
+            log.warning("Credits region not found in player crop data")
             return None
 
         credits_crop = player_crop_data["credits"]
@@ -122,13 +123,19 @@ class PreroundCreditsDetector(TemplateCreditsDetector):
 
         # Check if confidence meets threshold
         if confidence >= self.min_confidence:
-            log.debug(f"Player {player_index} pre-round credits visible with confidence: {confidence:.2f}")
+            log.debug(
+                f"Player {player_index} pre-round credits visible with confidence: "
+                f"{confidence:.2f}"
+            )
             return CreditsInfo(
                 credits_visible=True,
                 confidence=confidence,
             )
         else:
-            log.debug(f"Player {player_index} pre-round credits not visible (confidence: {confidence:.2f})")
+            log.debug(
+                f"Player {player_index} pre-round credits not visible "
+                f"(confidence: {confidence:.2f})"
+            )
             return CreditsInfo(
                 credits_visible=False,
                 confidence=confidence,

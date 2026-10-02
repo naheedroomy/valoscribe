@@ -6,8 +6,9 @@ Matches killer icons first, then flipped templates for victim icons.
 """
 
 from __future__ import annotations
-from typing import Optional
+
 from pathlib import Path
+from typing import Any, Optional
 
 import cv2
 import numpy as np
@@ -72,7 +73,7 @@ class KillfeedDetector:
                 f"templates: {len(self.templates)}, method: {match_method})"
             )
 
-    def _load_templates(self) -> dict[str, dict]:
+    def _load_templates(self) -> dict[str, dict[str, Any]]:
         """
         Load agent templates from attack and defense directories.
 
@@ -89,7 +90,7 @@ class KillfeedDetector:
                 "agent_name_defense": {"image": ndarray, "agent": "agent_name", "side": "defense"},
             }
         """
-        templates = {}
+        templates: dict[str, dict[str, Any]] = {}
 
         if not self.template_dir.exists():
             log.warning(f"Template directory does not exist: {self.template_dir}")
@@ -160,7 +161,7 @@ class KillfeedDetector:
 
         return templates
 
-    def detect(self, frame: np.ndarray) -> list[Optional[KillfeedAgentDetection]]:
+    def detect(self, frame: np.ndarray) -> list[tuple[int, KillfeedAgentDetection]]:
         """
         Detect kills from killfeed entries.
 
@@ -171,7 +172,7 @@ class KillfeedDetector:
             frame: Input frame (1080p)
 
         Returns:
-            List of KillfeedAgentDetection for detected kills (None for empty entries)
+            Candidate detections tagged with their killfeed entry index.
         """
         # Check if templates are loaded
         if len(self.templates) == 0:
@@ -248,6 +249,7 @@ class KillfeedDetector:
                     victim_agent=victim_agent,
                     victim_side=victim_side,
                     confidence=confidence,
+                    weapon=None,
                 )
                 detections.append((entry_idx, detection))
 
@@ -288,7 +290,10 @@ class KillfeedDetector:
                 template_img = cv2.flip(template_img, 1)
 
             # Skip if template is larger than crop
-            if template_img.shape[0] > preprocessed.shape[0] or template_img.shape[1] > preprocessed.shape[1]:
+            if (
+                template_img.shape[0] > preprocessed.shape[0]
+                or template_img.shape[1] > preprocessed.shape[1]
+            ):
                 continue
 
             # Color template matching
@@ -329,8 +334,8 @@ class KillfeedDetector:
         preprocessed = self._preprocess_crop(crop)
 
         best_confidence = 0.0
-        best_agent = None
-        best_side = None
+        best_agent: Optional[str] = None
+        best_side: Optional[str] = None
 
         # Try matching each template
         for template_key, template_data in self.templates.items():
@@ -343,7 +348,10 @@ class KillfeedDetector:
                 template_img = cv2.flip(template_img, 1)
 
             # Skip if template is larger than crop (can't match)
-            if template_img.shape[0] > preprocessed.shape[0] or template_img.shape[1] > preprocessed.shape[1]:
+            if (
+                template_img.shape[0] > preprocessed.shape[0]
+                or template_img.shape[1] > preprocessed.shape[1]
+            ):
                 log.debug(
                     f"Template {template_key} ({template_img.shape[:2]}) larger than crop "
                     f"({preprocessed.shape[:2]}), skipping"
@@ -376,6 +384,9 @@ class KillfeedDetector:
             log.debug(
                 f"Best match confidence {best_confidence:.2f} below threshold {self.min_confidence}"
             )
+            return None
+
+        if best_agent is None or best_side is None:
             return None
 
         return best_agent, best_side, best_confidence

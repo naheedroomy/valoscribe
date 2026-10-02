@@ -1,0 +1,23 @@
+{
+  "anchors": {
+    "anchor_blue": {
+      "center_normalized": [0.85, 0.766667],
+      "center_px": [272, 138],
+      "color_bgr": [255, 0, 0]
+    },
+    "anchor_green": {
+      "center_normalized": [0.5, 0.5],
+      "center_px": [160, 90],
+      "color_bgr": [0, 255, 0]
+    },
+    "anchor_red": {
+      "center_normalized": [0.15, 0.233333],
+      "center_px": [48, 42],
+      "color_bgr": [0, 0, 255]
+    }
+  },
+  "color_order": "BGR",
+  "fixture_id": "synthetic-anchor-frame-v1",
+  "height": 180,
+  "width": 320
+}

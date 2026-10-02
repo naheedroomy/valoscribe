@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0",
+  "match_id": "synthetic-match",
+  "map_id": "ascent",
+  "round_id": "synthetic-match-map1-round4",
+  "round_number": 4,
+  "hud_source": {
+    "schema_version": "1.0",
+    "source_id": "synthetic-hud-export",
+    "event_log_path": "event_log.jsonl",
+    "match_id": "synthetic-match",
+    "map_id": "ascent",
+    "round_id": "synthetic-match-map1-round4",
+    "round_number": 4,
+    "clock_domain": "synthetic_vod_seconds",
+    "bounds_evidence_reference": "synthetic fixture bounds, not reviewed production evidence",
+    "start_timestamp": 120.0,
+    "end_timestamp": 180.0
+  },
+  "diagnostics": []
+}

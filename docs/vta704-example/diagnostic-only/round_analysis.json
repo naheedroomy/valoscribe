@@ -1,0 +1,76 @@
+{
+  "schema_version": "1.0",
+  "analysis_kind": "single_round_evidence_inventory",
+  "match_id": "vta404-diagnostic-map3",
+  "map_id": "7eaecc1b-4337-bbf6-6ab9-04b8f06b3319",
+  "round_id": "vta404-map3-round4",
+  "round_number": 4,
+  "sample_round_count": 0,
+  "events_by_source": {},
+  "source_artifacts": {},
+  "source_clock_domains": {},
+  "source_bounds_references": {},
+  "observations": [],
+  "selected_observation_ids": [],
+  "interpretations": [],
+  "recommendations": [],
+  "diagnostics": [
+    {
+      "schema_version": "1.0",
+      "report_path": "round4-diagnostic-report.json",
+      "run_id": "vta404-ascent-map3-round4-diagnostic-r1",
+      "source_video_sha256": "a2feb25b842b6c1c2baa17f8ef0c5ecfe1816bd058a1c256350fa95900454c44",
+      "config_sha256": "f4ffb0353fc7407a43f5faef0659206735319b3d522a7d5153e48602ffb8de37",
+      "map_id": "7eaecc1b-4337-bbf6-6ab9-04b8f06b3319",
+      "map_number": 3,
+      "round_number": 4,
+      "start_frame_index": 15600,
+      "end_frame_index": 20520,
+      "start_source_pts": 3993600,
+      "end_source_pts": 5253120,
+      "timebase_numerator": 1,
+      "timebase_denominator": 15360,
+      "requested_frame_count": 4921,
+      "decoded_frame_count": 4921,
+      "context_live_frame_count": 23,
+      "context_nonlive_frame_count": 0,
+      "context_unknown_frame_count": 4898,
+      "candidate_count": 329997,
+      "accepted_candidate_count": 126138,
+      "rejected_candidate_count": 203859,
+      "observed_sample_count": 557,
+      "anonymous_tracklet_count": 557,
+      "frames_without_tracklet_sample": 4898,
+      "detector_confidence": {
+        "minimum": 0.04565440955509812,
+        "maximum": 0.885601260212358
+      },
+      "association_confidence": {
+        "minimum": 0.0,
+        "maximum": 0.0
+      },
+      "hud_config_sha256": "14cff68b034b32cdac6841e9e5534b456b53b0953ac7ec8ec8470f7590f489e3",
+      "color_config_sha256": "cbee57bba5010354bc891fe3821b800cdb56bdfd0616ea9c0d853c3f283fe4a1",
+      "map_config_sha256": "04e85050b9314d200d65927ad8ea305b7a086bb24b0d7b84c03412e410cc500e",
+      "map_asset_sha256": "6094459e109b1f4e9d500277ebc4ce1392dd98fb4f2d92005be932105be8a593",
+      "artifacts": {
+        "anonymous_tracklets": "anonymous_tracklets.parquet",
+        "diagnostic_json": "diagnostic_report.json",
+        "diagnostic_markdown": "report.md",
+        "minimap_replay": "anonymous_minimap_replay.mp4",
+        "raw_candidates": "raw_observations.jsonl",
+        "run_manifest": "anonymous_run.json"
+      },
+      "player_identity": "unavailable",
+      "canonical_map_coordinates": "unavailable",
+      "tactical_claims": "not_made",
+      "quality_metrics": "unavailable_without_independent_ground_truth"
+    }
+  ],
+  "limitations": [
+    "HUD tactical events unavailable; behavior is unknown / not observed.",
+    "Anonymous minimap diagnostics describe tracklets only and are not tactical evidence.",
+    "One round cannot establish recurring habits or anti-strat patterns.",
+    "Model-reported confidence is subjective and is not calibrated."
+  ]
+}

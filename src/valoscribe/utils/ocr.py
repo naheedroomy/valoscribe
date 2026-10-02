@@ -6,17 +6,32 @@ and preprocessing utilities optimized for different text extraction scenarios.
 """
 
 from __future__ import annotations
-from typing import Optional
+
 from enum import Enum
+from typing import Optional, TypedDict, cast
 
 import cv2
 import numpy as np
-import pytesseract
-from pytesseract import Output
+import pytesseract  # type: ignore[import-untyped]
+from pytesseract import Output  # type: ignore[import-untyped]
 
 from valoscribe.utils.logger import get_logger
 
 log = get_logger(__name__)
+
+
+class _OCRData(TypedDict):
+    text: list[str]
+    conf: list[int]
+    line_num: list[int]
+
+
+def _image_to_data(image: np.ndarray, config: str, lang: str) -> _OCRData:
+    """Give pytesseract's untyped dictionary result the fields used here."""
+    data = pytesseract.image_to_data(
+        image, lang=lang, config=config, output_type=Output.DICT
+    )
+    return cast(_OCRData, data)
 
 
 class PSM(Enum):
@@ -76,9 +91,7 @@ class OCREngine:
             image = self.preprocess_for_text(image)
 
         config = self._build_config(PSM.SINGLE_LINE, whitelist)
-        data = pytesseract.image_to_data(
-            image, lang=self.lang, config=config, output_type=Output.DICT
-        )
+        data = _image_to_data(image, config, self.lang)
 
         # Extract text and confidence
         text = " ".join([t for t in data["text"] if t.strip()])
@@ -112,9 +125,7 @@ class OCREngine:
 
         # Use single line mode and digit whitelist
         config = self._build_config(PSM.SINGLE_LINE, "0123456789")
-        data = pytesseract.image_to_data(
-            image, lang=self.lang, config=config, output_type=Output.DICT
-        )
+        data = _image_to_data(image, config, self.lang)
 
         # Extract text and confidence
         text = " ".join([t for t in data["text"] if t.strip()])
@@ -152,9 +163,7 @@ class OCREngine:
             image = self.preprocess_for_text(image)
 
         config = self._build_config(PSM.SINGLE_CHAR, whitelist)
-        data = pytesseract.image_to_data(
-            image, lang=self.lang, config=config, output_type=Output.DICT
-        )
+        data = _image_to_data(image, config, self.lang)
 
         # Extract first character
         for text, conf in zip(data["text"], data["conf"]):
@@ -186,9 +195,7 @@ class OCREngine:
             image = self.preprocess_for_text(image)
 
         config = self._build_config(PSM.AUTO, whitelist)
-        data = pytesseract.image_to_data(
-            image, lang=self.lang, config=config, output_type=Output.DICT
-        )
+        data = _image_to_data(image, config, self.lang)
 
         # Group text by line number
         lines: dict[int, list[str]] = {}

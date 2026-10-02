@@ -1,0 +1,53 @@
+{
+  "schema_version": "1.0",
+  "evaluation_id": "ascent-vta103-smoke-window-feature-registration",
+  "label_status": "provisional_visually_reviewed_nonblind",
+  "source_video": {
+    "filename": "YTDown.com_YouTube_Media_4LEGEQ8KBS0_100T-vs-LOUD-VCT-Americas-Stage-2-Playoffs-Grand-Final-Map-3-Ascent_001_1080p.mp4",
+    "availability": "external local file; video pixels are not included in this repository",
+    "frame_dimensions_px": {"width": 1920, "height": 1080},
+    "crop_dimensions_px": {"width": 360, "height": 400},
+    "crop_profile": "vct_americas_2026_stage2_final_1080p_candidate",
+    "crop_orientation": "rotate_90_ccw"
+  },
+  "canonical_asset": {
+    "decoded_image_sha256": "14b91544abe32234934cafe24be330a488743a99295f49aec5c317c62740d984"
+  },
+  "label_limitations": "A reviewer visually inspected the unannotated raw crops but had later seen prior fixture labels. These points are provisional estimates, not blind or pixel-verified ground truth.",
+  "samples": [
+    {
+      "sample_id": "smoke-window-2490s",
+      "split": "test",
+      "timestamp_seconds": 2490,
+      "source_frame_decoded_sha256": "228589eb602d57d757f31843efd0c936f3f3617bf387945deb1ed771c9efbbcb",
+      "labels": {
+        "provenance": "Provisional visual landmarks; reviewer saw prior fixture labels; approximate, not blind ground truth.",
+        "source_frame_sha256": "228589eb602d57d757f31843efd0c936f3f3617bf387945deb1ed771c9efbbcb",
+        "canonical_asset_sha256": "14b91544abe32234934cafe24be330a488743a99295f49aec5c317c62740d984",
+        "landmarks": [
+          {"landmark_id": "L1_upper_cap_left", "source_crop_point": {"x": 177, "y": 8}, "canonical_point": {"x": 82, "y": 1030}},
+          {"landmark_id": "L2_upper_cap_right", "source_crop_point": {"x": 229, "y": 8}, "canonical_point": {"x": 82, "y": 773}},
+          {"landmark_id": "L3_A_outer_upper_right", "source_crop_point": {"x": 354, "y": 87}, "canonical_point": {"x": 466, "y": 159}},
+          {"landmark_id": "L4_B_leftmost_protrusion_upper", "source_crop_point": {"x": 7, "y": 83}, "canonical_point": {"x": 453, "y": 1872}}
+        ]
+      }
+    },
+    {
+      "sample_id": "smoke-window-2505s",
+      "split": "test",
+      "timestamp_seconds": 2505,
+      "source_frame_decoded_sha256": "f472f552dd047647e2c51d4ce54ec47a92fcdc9bda669bb3aeff7a7294b1fd32",
+      "labels": {
+        "provenance": "Provisional visual landmarks; reviewer saw prior fixture labels; approximate, not blind ground truth.",
+        "source_frame_sha256": "f472f552dd047647e2c51d4ce54ec47a92fcdc9bda669bb3aeff7a7294b1fd32",
+        "canonical_asset_sha256": "14b91544abe32234934cafe24be330a488743a99295f49aec5c317c62740d984",
+        "landmarks": [
+          {"landmark_id": "L1_upper_cap_left", "source_crop_point": {"x": 177, "y": 8}, "canonical_point": {"x": 82, "y": 1030}},
+          {"landmark_id": "L2_upper_cap_right", "source_crop_point": {"x": 229, "y": 8}, "canonical_point": {"x": 82, "y": 773}},
+          {"landmark_id": "L3_A_outer_upper_right", "source_crop_point": {"x": 354, "y": 87}, "canonical_point": {"x": 466, "y": 159}},
+          {"landmark_id": "L4_B_leftmost_protrusion_upper", "source_crop_point": {"x": 7, "y": 83}, "canonical_point": {"x": 453, "y": 1872}}
+        ]
+      }
+    }
+  ]
+}

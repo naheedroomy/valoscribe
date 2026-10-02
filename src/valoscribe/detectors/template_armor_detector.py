@@ -6,8 +6,9 @@ Allows small overlap (1-2px) between digit matches due to small text size.
 """
 
 from __future__ import annotations
-from typing import Optional
+
 from pathlib import Path
+from typing import Any, Optional
 
 import cv2
 import numpy as np
@@ -75,7 +76,7 @@ class TemplateArmorDetector:
         Returns:
             Dictionary mapping digit strings to template images
         """
-        templates = {}
+        templates: dict[str, np.ndarray] = {}
 
         if not self.template_dir.exists():
             log.warning(f"Template directory does not exist: {self.template_dir}")
@@ -143,7 +144,7 @@ class TemplateArmorDetector:
 
         # Get armor crop
         if "armor" not in player_crop_data:
-            log.warning(f"Armor region not found in player crop data")
+            log.warning("Armor region not found in player crop data")
             return None
 
         armor_crop = player_crop_data["armor"]
@@ -210,7 +211,9 @@ class TemplateArmorDetector:
         if len(filtered_matches) > 2:
             log.warning(f"Too many digits detected ({len(filtered_matches)}), keeping best 2")
             # Keep the 2 highest confidence matches
-            filtered_matches = sorted(filtered_matches, key=lambda m: m["confidence"], reverse=True)[:2]
+            filtered_matches = sorted(
+                filtered_matches, key=lambda m: m["confidence"], reverse=True
+            )[:2]
             # Re-sort by position after keeping top 2
             filtered_matches.sort(key=lambda m: m["x"])
 
@@ -226,7 +229,7 @@ class TemplateArmorDetector:
 
         # Fix OCR errors: treat 58 as 50 (common misread due to small text)
         if armor == 58:
-            log.debug(f"Correcting armor value 58 → 50 (OCR error)")
+            log.debug("Correcting armor value 58 → 50 (OCR error)")
             armor = 50
             raw_text = "50"
 
@@ -301,7 +304,7 @@ class TemplateArmorDetector:
         # Sort by confidence (descending)
         sorted_matches = sorted(matches, key=lambda m: m["confidence"], reverse=True)
 
-        filtered = []
+        filtered: list[dict[str, Any]] = []
 
         for match in sorted_matches:
             # Check if this match overlaps with any already accepted match

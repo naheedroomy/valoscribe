@@ -1,11 +1,12 @@
 """Unit tests for template-based spike detector."""
 
 from __future__ import annotations
+
 from unittest.mock import Mock, patch
-from pathlib import Path
-import pytest
-import numpy as np
+
 import cv2
+import numpy as np
+import pytest
 
 from valoscribe.detectors.template_spike_detector import TemplateSpikeDetector
 from valoscribe.types.detections import SpikeInfo

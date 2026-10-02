@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "map_id": "7eaecc1b-4337-bbf6-6ab9-04b8f06b3319",
+  "map_name": "Ascent",
+  "coordinate_system": "normalized_top_left_origin",
+  "canonical_minimap": {
+    "schema_version": "1.0",
+    "image_url": "https://valorant.dyn.riotcdn.net/x/content-catalog/PublicContentCatalog-release-13.06.zip#Maps/7EAECC1B-4337-BBF6-6AB9-04B8F06B3319.png",
+    "local_asset_path": "maps/ascent_public_content_13_06.png",
+    "sha256": "6094459e109b1f4e9d500277ebc4ce1392dd98fb4f2d92005be932105be8a593",
+    "asset_version": "Riot Public Content Catalog release 13.06",
+    "patch_version": null,
+    "provenance": "Bundled Riot-published public-content asset from Maps/7EAECC1B-4337-BBF6-6AB9-04B8F06B3319.png. Riot VALORANT Developer Portal states the catalog assets are free to use; follow Riot policy. This release label is catalog version, not a verified game patch."
+  },
+  "geometry_status": "pending",
+  "walkable_areas": [],
+  "site_polygons": [
+    {
+      "polygon_id": "asset-highlight-top",
+      "vertices": [
+        {"x": 0.26904296875, "y": 0.0791015625},
+        {"x": 0.3544921875, "y": 0.0791015625},
+        {"x": 0.3544921875, "y": 0.216796875},
+        {"x": 0.26904296875, "y": 0.216796875}
+      ]
+    },
+    {
+      "polygon_id": "asset-highlight-bottom",
+      "vertices": [
+        {"x": 0.2080078125, "y": 0.7333984375},
+        {"x": 0.33740234375, "y": 0.7333984375},
+        {"x": 0.33740234375, "y": 0.85205078125},
+        {"x": 0.2080078125, "y": 0.85205078125}
+      ]
+    }
+  ],
+  "spawn_polygons": [],
+  "named_zones": [],
+  "orientation_rules": [],
+  "registration_thresholds": {
+    "minimum_confidence": 0.3,
+    "maximum_alignment_error": 0.25,
+    "maximum_landmark_error_px": 25
+  },
+  "feature_registration": {
+    "schema_version": "1.0",
+    "source_gray_range": [65, 165],
+    "canonical_gray_range": [65, 160],
+    "maximum_source_channel_spread": 10,
+    "minimum_feature_coverage": 0.05,
+    "maximum_feature_coverage": 0.60,
+    "minimum_confidence": 0.70,
+    "maximum_alignment_error": 0.15
+  }
+}

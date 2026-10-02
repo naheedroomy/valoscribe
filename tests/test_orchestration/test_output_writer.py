@@ -1,12 +1,14 @@
 """Unit tests for OutputWriter."""
 
 from __future__ import annotations
-import pytest
+
 import csv
 import json
-from pathlib import Path
-import tempfile
 import shutil
+import tempfile
+from pathlib import Path
+
+import pytest
 
 from valoscribe.orchestration.output_writer import OutputWriter
 from valoscribe.orchestration.phase_detector import Phase
@@ -33,7 +35,11 @@ class TestOutputWriter:
         """Create sample player states."""
         return [
             {
-                "metadata": {"name": f"player{i}", "team": "team1" if i < 5 else "team2", "agent": "sova"},
+                "metadata": {
+                    "name": f"player{i}",
+                    "team": "team1" if i < 5 else "team2",
+                    "agent": "sova",
+                },
                 "current_state": {
                     "alive": True,
                     "health": 100,
@@ -60,7 +66,7 @@ class TestOutputWriter:
     def test_init_creates_directory(self, temp_dir):
         """Test that initialization creates output directory."""
         nested_dir = temp_dir / "nested" / "output"
-        writer = OutputWriter(output_dir=nested_dir)
+        OutputWriter(output_dir=nested_dir)
 
         assert nested_dir.exists()
         assert nested_dir.is_dir()
@@ -381,7 +387,11 @@ class TestOutputWriter:
             for frame_num in range(1, 6):
                 player_states = [
                     {
-                        "metadata": {"name": f"player{i}", "team": "team1" if i < 5 else "team2", "agent": "sova"},
+                        "metadata": {
+                            "name": f"player{i}",
+                            "team": "team1" if i < 5 else "team2",
+                            "agent": "sova",
+                        },
                         "current_state": {
                             "alive": True,
                             "health": 100 - frame_num * 10,

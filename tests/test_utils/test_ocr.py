@@ -1,11 +1,13 @@
 """Unit tests for OCR utility."""
 
 from __future__ import annotations
-from unittest.mock import patch, Mock
-import pytest
-import numpy as np
 
-from valoscribe.utils.ocr import OCREngine, PSM
+from unittest.mock import patch
+
+import numpy as np
+import pytest
+
+from valoscribe.utils.ocr import PSM, OCREngine
 
 
 class TestOCREngine:

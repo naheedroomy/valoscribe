@@ -1,0 +1,610 @@
+{
+  "schema_version": "vta304-portrait-center-dev-v1",
+  "interpretation": "approximate independent visual development annotations; not calibrated ground truth or complete player counts",
+  "coordinate_convention": "native crop pixels; top-left origin; xywh visible boundaries",
+  "source_manifest_sha256": "95adb564bf8a2a1858063b280fb5e8eacb186f395e52711f80b9329579228f10",
+  "frames": [
+    {
+      "frame_index": 15758,
+      "source_pts": 4034048,
+      "path": "candidate_minimap_crops/frame-015758-pts-4034048-candidate-crop.png",
+      "png_sha256": "87c8e30877e5ad86324830e2cfd99e08eece69a7a3a7d6a8ae2517077681b556",
+      "decoded_crop_bgr_sha256": "156db0a2e086402ffb24f7f65072b73221326ec05d9ef506c3dd45ea322dac44",
+      "labels": [
+        {
+          "id": "f15758-a",
+          "center_xy": [
+            69,
+            132
+          ],
+          "visible_bbox_xywh": [
+            59,
+            122,
+            20,
+            20
+          ],
+          "uncertainty_px": 2.2360679775,
+          "state": "visible",
+          "review_evidence": [
+            "first review 68,130 bbox 59,121,18,18",
+            "recovery review 69,132 bbox 59,122,20,20"
+          ],
+          "review_observations": [
+            {
+              "reviewer": "labels-review",
+              "center_xy": [
+                68,
+                130
+              ],
+              "visible_bbox_xywh": [
+                59,
+                121,
+                18,
+                18
+              ],
+              "evidence": "green rim, face-like interior"
+            },
+            {
+              "reviewer": "recovery-review",
+              "center_xy": [
+                69,
+                132
+              ],
+              "visible_bbox_xywh": [
+                59,
+                122,
+                20,
+                20
+              ],
+              "evidence": "green circular rim, pale face-like interior"
+            }
+          ],
+          "overlap": false
+        },
+        {
+          "id": "f15758-b",
+          "center_xy": [
+            94,
+            142
+          ],
+          "visible_bbox_xywh": [
+            84,
+            132,
+            21,
+            20
+          ],
+          "uncertainty_px": 2,
+          "state": "visible",
+          "review_evidence": [
+            "first review 95,142 bbox 86,133,18,18",
+            "recovery review 94,142 bbox 84,132,21,20"
+          ],
+          "review_observations": [
+            {
+              "reviewer": "labels-review",
+              "center_xy": [
+                95,
+                142
+              ],
+              "visible_bbox_xywh": [
+                86,
+                133,
+                18,
+                18
+              ],
+              "evidence": "green/cyan rim, portrait-like interior"
+            },
+            {
+              "reviewer": "recovery-review",
+              "center_xy": [
+                94,
+                142
+              ],
+              "visible_bbox_xywh": [
+                84,
+                132,
+                21,
+                20
+              ],
+              "evidence": "green rim and dark/tan interior"
+            }
+          ],
+          "overlap": false
+        },
+        {
+          "id": "f15758-c",
+          "center_xy": [
+            121,
+            124
+          ],
+          "visible_bbox_xywh": [
+            111,
+            114,
+            20,
+            20
+          ],
+          "uncertainty_px": 2,
+          "state": "visible",
+          "review_evidence": [
+            "first review 120,125 bbox 111,116,18,18",
+            "recovery review 121,124 bbox 111,114,20,20"
+          ],
+          "review_observations": [
+            {
+              "reviewer": "labels-review",
+              "center_xy": [
+                120,
+                125
+              ],
+              "visible_bbox_xywh": [
+                111,
+                116,
+                18,
+                18
+              ],
+              "evidence": "cyan rim, blue/dark portrait-like interior"
+            },
+            {
+              "reviewer": "recovery-review",
+              "center_xy": [
+                121,
+                124
+              ],
+              "visible_bbox_xywh": [
+                111,
+                114,
+                20,
+                20
+              ],
+              "evidence": "green rim enclosing dark detail"
+            }
+          ],
+          "overlap": false
+        },
+        {
+          "id": "f15758-d",
+          "center_xy": [
+            322,
+            168
+          ],
+          "visible_bbox_xywh": [
+            311,
+            157,
+            21,
+            22
+          ],
+          "uncertainty_px": 8,
+          "state": "visible",
+          "review_evidence": [
+            "first review 324,167 bbox 315,158,18,18",
+            "recovery review 322,168 bbox 311,157,21,22",
+            "centers disagree; uncertainty widened to include both observations"
+          ],
+          "review_observations": [
+            {
+              "reviewer": "labels-review",
+              "center_xy": [
+                324,
+                167
+              ],
+              "visible_bbox_xywh": [
+                315,
+                158,
+                18,
+                18
+              ],
+              "evidence": "left disk in overlapping pair"
+            },
+            {
+              "reviewer": "recovery-review",
+              "center_xy": [
+                322,
+                168
+              ],
+              "visible_bbox_xywh": [
+                311,
+                157,
+                21,
+                22
+              ],
+              "evidence": "left disk with partly obscured rim"
+            }
+          ],
+          "overlap": true
+        },
+        {
+          "id": "f15758-e",
+          "center_xy": [
+            333,
+            170
+          ],
+          "visible_bbox_xywh": [
+            324,
+            158,
+            22,
+            23
+          ],
+          "uncertainty_px": 8,
+          "state": "visible",
+          "review_evidence": [
+            "first review 337,167 bbox 328,158,18,18",
+            "recovery review 333,170 bbox 324,160,19,21",
+            "centers disagree; uncertainty widened to include both observations"
+          ],
+          "review_observations": [
+            {
+              "reviewer": "labels-review",
+              "center_xy": [
+                337,
+                167
+              ],
+              "visible_bbox_xywh": [
+                328,
+                158,
+                18,
+                18
+              ],
+              "evidence": "right disk in overlapping pair"
+            },
+            {
+              "reviewer": "recovery-review",
+              "center_xy": [
+                333,
+                170
+              ],
+              "visible_bbox_xywh": [
+                324,
+                160,
+                19,
+                21
+              ],
+              "evidence": "right disk with partly obscured rim"
+            }
+          ],
+          "overlap": true
+        },
+        {
+          "id": "f15758-f",
+          "center_xy": [
+            107,
+            204
+          ],
+          "visible_bbox_xywh": [
+            97,
+            194,
+            20,
+            20
+          ],
+          "uncertainty_px": 4,
+          "state": "visible",
+          "review_evidence": [
+            "first review 105,205; partially obscured",
+            "recovery review 107,204; portrait-like rim but overlap and symbol ambiguity"
+          ],
+          "review_observations": [
+            {
+              "reviewer": "labels-review",
+              "center_xy": [
+                105,
+                205
+              ],
+              "visible_bbox_xywh": [
+                96,
+                196,
+                18,
+                18
+              ],
+              "evidence": "pale portrait-like disk, ping/neighbor overlap"
+            },
+            {
+              "reviewer": "recovery-review",
+              "center_xy": [
+                107,
+                204
+              ],
+              "visible_bbox_xywh": [
+                97,
+                194,
+                20,
+                20
+              ],
+              "evidence": "pale portrait-like disk, rim partly obscured"
+            }
+          ],
+          "overlap": true
+        },
+        {
+          "id": "f15758-g",
+          "center_xy": [
+            275,
+            225
+          ],
+          "visible_bbox_xywh": [
+            265,
+            214,
+            20,
+            23
+          ],
+          "uncertainty_px": 2,
+          "state": "visible",
+          "review_evidence": [
+            "first review 275,227 bbox 266,218,18,18",
+            "recovery review 275,225 bbox 265,214,20,23"
+          ],
+          "review_observations": [
+            {
+              "reviewer": "labels-review",
+              "center_xy": [
+                275,
+                227
+              ],
+              "visible_bbox_xywh": [
+                266,
+                218,
+                18,
+                18
+              ],
+              "evidence": "red rim and face-like detail"
+            },
+            {
+              "reviewer": "recovery-review",
+              "center_xy": [
+                275,
+                225
+              ],
+              "visible_bbox_xywh": [
+                265,
+                214,
+                20,
+                23
+              ],
+              "evidence": "red rim around dark/pale detail"
+            }
+          ],
+          "overlap": false
+        }
+      ],
+      "uncertain_objects": [
+        {
+          "id": "f15758-cluster",
+          "center_xy": [
+            125,
+            201
+          ],
+          "visible_bbox_xywh": [
+            66,
+            181,
+            70,
+            43
+          ],
+          "uncertainty_px": 12,
+          "state": "uncertain",
+          "review_evidence": [
+            "crowded red-rim shapes, symbol and ping interference; not positive or negative"
+          ]
+        }
+      ],
+      "negative_regions": [
+        {
+          "id": "f15758-neg1",
+          "bbox_xywh": [
+            183,
+            12,
+            40,
+            20
+          ],
+          "state": "portrait_free",
+          "review_evidence": [
+            "both reviews identify clear map/background intersection patch"
+          ]
+        }
+      ]
+    },
+    {
+      "frame_index": 20480,
+      "source_pts": 5242880,
+      "path": "candidate_minimap_crops/frame-020480-pts-5242880-candidate-crop.png",
+      "png_sha256": "96adc48dd082deafd37d28017abcdb821061eca528a354bc3b876d4c22973bad",
+      "decoded_crop_bgr_sha256": "a0cf0bcc3fb68381f2439a414699de6e16874f10efc49a46c221c97f90b7796a",
+      "labels": [
+        {
+          "id": "f20480-a",
+          "center_xy": [
+            261,
+            64
+          ],
+          "visible_bbox_xywh": [
+            251,
+            53,
+            21,
+            22
+          ],
+          "uncertainty_px": 5,
+          "state": "visible",
+          "review_evidence": [
+            "first review 262,60 bbox 253,51,18,18",
+            "recovery review 261,64 bbox 251,53,21,22; disagreement included in envelope"
+          ],
+          "review_observations": [
+            {
+              "reviewer": "labels-review",
+              "center_xy": [
+                262,
+                60
+              ],
+              "visible_bbox_xywh": [
+                253,
+                51,
+                18,
+                18
+              ],
+              "evidence": "green rim and portrait-like interior"
+            },
+            {
+              "reviewer": "recovery-review",
+              "center_xy": [
+                261,
+                64
+              ],
+              "visible_bbox_xywh": [
+                251,
+                53,
+                21,
+                22
+              ],
+              "evidence": "green boundary and dark/tan detail"
+            }
+          ],
+          "overlap": false
+        },
+        {
+          "id": "f20480-b",
+          "center_xy": [
+            305,
+            92
+          ],
+          "visible_bbox_xywh": [
+            295,
+            81,
+            20,
+            22
+          ],
+          "uncertainty_px": 2,
+          "state": "visible",
+          "review_evidence": [
+            "both reviews center 305,92 with bounds within 1px"
+          ],
+          "review_observations": [
+            {
+              "reviewer": "labels-review",
+              "center_xy": [
+                305,
+                92
+              ],
+              "visible_bbox_xywh": [
+                296,
+                83,
+                18,
+                18
+              ],
+              "evidence": "green rim around portrait-like interior"
+            },
+            {
+              "reviewer": "recovery-review",
+              "center_xy": [
+                305,
+                92
+              ],
+              "visible_bbox_xywh": [
+                295,
+                81,
+                20,
+                22
+              ],
+              "evidence": "green rim around pale face-like interior"
+            }
+          ],
+          "overlap": false
+        },
+        {
+          "id": "f20480-c",
+          "center_xy": [
+            347,
+            119
+          ],
+          "visible_bbox_xywh": [
+            337,
+            108,
+            22,
+            22
+          ],
+          "uncertainty_px": 3.1622776602,
+          "state": "visible",
+          "review_evidence": [
+            "first review center 348,116 bbox 339,107,18,18",
+            "recovery review center 347,119 bbox 337,108,22,22"
+          ],
+          "review_observations": [
+            {
+              "reviewer": "labels-review",
+              "center_xy": [
+                348,
+                116
+              ],
+              "visible_bbox_xywh": [
+                339,
+                107,
+                18,
+                18
+              ],
+              "evidence": "right-edge portrait-like disk"
+            },
+            {
+              "reviewer": "recovery-review",
+              "center_xy": [
+                347,
+                119
+              ],
+              "visible_bbox_xywh": [
+                337,
+                108,
+                22,
+                22
+              ],
+              "evidence": "red/pink rim around dark portrait-like detail"
+            }
+          ],
+          "overlap": false
+        }
+      ],
+      "uncertain_objects": [
+        {
+          "id": "f20480-cluster",
+          "center_xy": [
+            332,
+            104
+          ],
+          "visible_bbox_xywh": [
+            321,
+            94,
+            22,
+            21
+          ],
+          "uncertainty_px": 8,
+          "state": "uncertain",
+          "review_evidence": [
+            "crowded disk and ping overlap; no positive or negative assignment"
+          ]
+        }
+      ],
+      "negative_regions": [
+        {
+          "id": "f20480-neg1",
+          "bbox_xywh": [
+            183,
+            12,
+            40,
+            20
+          ],
+          "state": "portrait_free",
+          "review_evidence": [
+            "both reviews identify clear map/background intersection patch"
+          ]
+        },
+        {
+          "id": "f20480-neg2",
+          "bbox_xywh": [
+            66,
+            216,
+            22,
+            22
+          ],
+          "state": "portrait_free",
+          "review_evidence": [
+            "recovery review clear background patch"
+          ]
+        }
+      ]
+    }
+  ]
+}

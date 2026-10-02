@@ -1,6 +1,7 @@
 """Timer manager for tracking game time across different contexts."""
 
 from __future__ import annotations
+
 from typing import Optional
 
 from valoscribe.orchestration.phase_detector import Phase
@@ -16,7 +17,7 @@ class TimerManager:
     3. post_round_timer: Time since round end - calculated
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize timer manager."""
         self.spike_planted_at: Optional[float] = None
         self.round_ended_at: Optional[float] = None
@@ -64,7 +65,7 @@ class TimerManager:
             - spike_timer: Seconds since spike plant (None if not planted)
             - post_round_timer: Seconds since round end (None if not in post-round)
         """
-        timers = {
+        timers: dict[str, Optional[float]] = {
             "game_timer": None,
             "spike_timer": None,
             "post_round_timer": None,

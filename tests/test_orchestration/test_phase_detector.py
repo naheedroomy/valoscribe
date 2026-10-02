@@ -1,12 +1,14 @@
 """Unit tests for PhaseDetector."""
 
 from __future__ import annotations
+
 from unittest.mock import Mock
-import pytest
+
 import numpy as np
+import pytest
 
 from valoscribe.orchestration.phase_detector import Phase, PhaseDetector
-from valoscribe.types.detections import TimerInfo, SpikeInfo, ScoreInfo, CreditsInfo
+from valoscribe.types.detections import CreditsInfo, ScoreInfo, SpikeInfo, TimerInfo
 
 
 class TestPhaseDetector:
