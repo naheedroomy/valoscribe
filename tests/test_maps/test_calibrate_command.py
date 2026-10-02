@@ -543,9 +543,10 @@ def test_vod_candidate_profile_and_reference_manifest_remain_pending() -> None:
             / "src/valoscribe/config/ascent_vct_americas_2026_stage2_final_1080p_candidate.json"
         ).read_text(encoding="utf-8")
     )
-    manifest = json.loads(
-        (repository / "docs/minimap_calibration_vod_manifest.json").read_text(encoding="utf-8")
+    manifest_path = (
+        repository / "tests" / "fixtures" / "minimap_calibration_vod_manifest.json"
     )
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 
     assert profile["calibration_status"] == "pending"
     assert profile["minimap"] == {

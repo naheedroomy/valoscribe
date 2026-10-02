@@ -9,7 +9,7 @@ from pydantic_core import PydanticSerializationError
 from valoscribe.types.cast_observation import ReviewedCastObservation
 from valoscribe.types.smoke_evaluation import ReviewedSmokeLabel
 
-ARTIFACT = Path(__file__).parents[2] / "docs/vta502_cast_observation_1425.json"
+ARTIFACT = Path(__file__).parents[2] / "tests/fixtures/vta502_cast_observation_1425.json"
 
 
 def test_vta502_cast_artifact_records_cast_identity_not_smoke_ground_truth() -> None:

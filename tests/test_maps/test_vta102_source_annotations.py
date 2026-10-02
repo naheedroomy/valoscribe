@@ -9,7 +9,7 @@ import pytest
 
 ROOT = Path(__file__).parents[2]
 FIXTURE_PATH = ROOT / "tests/fixtures/map_annotations/ascent-vta102-source-interior-v1.json"
-VALIDATOR = run_path(str(ROOT / "scripts/validate_vta102_source_annotations.py"))
+VALIDATOR = run_path(str(ROOT / "scripts/maintenance/validate_vta102_source_annotations.py"))
 VALIDATE = VALIDATOR["validate"]
 VALIDATION_ERROR = VALIDATOR["AnnotationValidationError"]
 

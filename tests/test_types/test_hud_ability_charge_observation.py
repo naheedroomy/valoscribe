@@ -17,7 +17,12 @@ from valoscribe.types.hud_charge_observation import (
 )
 from valoscribe.types.smoke_source_observation import SmokeSourceCrop
 
-MANIFEST_PATH = Path(__file__).parents[2] / "docs" / "hud_ability_charge_observation_vta503.json"
+MANIFEST_PATH = (
+    Path(__file__).parents[2]
+    / "tests"
+    / "fixtures"
+    / "hud_ability_charge_observation_vta503.json"
+)
 
 
 def test_vta503_manifest_validates_as_evidence_only_observation() -> None:

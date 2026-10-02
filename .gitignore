@@ -40,16 +40,19 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 
-# Outputs
+# Machine-local sources and generated outputs
+.local/
+artifacts/
+runs/
+.cache/
 series_output/
-*.mp4
-!demo.mp4
-*.avi
-*.mkv
 nrg_edg_output/
 debug_frames/
 debug_crops/
 *.log
+
+# Legacy processed data artifacts (source metadata under this tree remains trackable)
+champs2025_processed_vods/**/output/
 
 # OS
 .DS_Store
@@ -58,6 +61,7 @@ Thumbs.db
 # Temporary
 *.tmp
 *.bak
+tmp/
 /tmp/
 /progress.md
 

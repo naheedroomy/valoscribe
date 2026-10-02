@@ -107,7 +107,7 @@ def test_vta201_review_manifest_has_corrected_labels_regions_and_pinned_hashes()
     from pathlib import Path
 
     manifest = json.loads(
-        (Path(__file__).parents[2] / "docs/minimap_color_review_vta201.json").read_text()
+        (Path(__file__).parents[2] / "tests/fixtures/minimap_color_review_vta201.json").read_text()
     )
     frames = manifest["frames"]
     assert [frame["split"] for frame in frames] == ["train", "heldout"]

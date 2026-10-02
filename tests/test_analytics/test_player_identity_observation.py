@@ -53,7 +53,7 @@ def observation_data() -> dict[str, object]:
 
 def test_vta304_fixture_records_bang_and_uncertain_unlocalized_frames():
     fixture_path = (
-        Path(__file__).parents[2] / "docs/player_identity_observation_vta304_round4.json"
+        Path(__file__).parents[2] / "tests/fixtures/player_identity_observation_vta304_round4.json"
     )
     observation = PlayerIdentityObservation.model_validate_json(fixture_path.read_text())
 
@@ -73,11 +73,12 @@ def test_vta304_fixture_records_bang_and_uncertain_unlocalized_frames():
 def test_vta304_pts_v2_fixture_is_bound_to_six_reviewed_source_rasters():
     root = Path(__file__).parents[2]
     fixture = PlayerIdentityObservation.model_validate_json(
-        (root / "docs/player_identity_observation_vta304_round4_pts_v2.json").read_text()
+        (root / "tests/fixtures/player_identity_observation_vta304_round4_pts_v2.json").read_text()
     )
-    review = json.loads(
-        (root / "docs/player_identity_observation_vta304_round4_pts_v2_review.json").read_text()
+    review_path = (
+        root / "tests/fixtures/player_identity_observation_vta304_round4_pts_v2_review.json"
     )
+    review = json.loads(review_path.read_text())
     frames = {frame["frame_index"]: frame for frame in review["source_capture"]["frames"]}
     assert [sample.frame_index for sample in fixture.samples] == [
         18000, 18001, 18002, 18060, 18120, 18121

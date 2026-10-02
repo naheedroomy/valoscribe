@@ -1,44 +1,26 @@
-# AGENTS.md
+# Agent instructions
 
-## Mission
+## Active source of truth
 
-Extend the Valoscribe fork into an offline, evidence-backed VALORANT tactical movement analyzer. The system reconstructs player movement, spike state, supported utility, round phases, and scenario patterns from professional spectator VODs.
+The only active implementation specification is [`specs/active/MVP_RESET_AND_REPOSITORY_CLEANUP_SPEC.md`](specs/active/MVP_RESET_AND_REPOSITORY_CLEANUP_SPEC.md). It supersedes the earlier broad `PROJECT_SPEC.md` and numbered-VTA sequence for this milestone. Read it before implementation. The documentation map is [`docs/README.md`](docs/README.md); code/config placement is [`docs/architecture/code-layout.md`](docs/architecture/code-layout.md).
 
-`PROJECT_SPEC.md` is the source of truth.
+## Scope lock: VALORANT MVP Reset v1.0
 
-## Non-negotiable rules
+Deliver an offline, retrospective, minimap-first team-shape analysis on one local Ascent broadcast and at least five selected rounds. Team-level occupancy/movement is sufficient. Manual intervals, source-specific crop/color config, human correction, and cautious deterministic summaries are allowed. Identity/tracking, full HUD, utility/spike reconstruction, automatic round discovery, multiple maps/layouts, cloud work, and LLM calls are deferred. Do not treat tests, abstention, architecture, or provider plumbing as the real product result.
 
-1. Work on one numbered VTA issue at a time.
-2. Read the existing code before modifying architecture.
-3. Preserve Valoscribe behavior unless the active issue explicitly migrates it.
-4. Keep the LLM disabled by default and out of the core CV pipeline.
-5. No API key or external network dependency in tests.
-6. Never assume a broadcast color permanently means attack or defense.
-7. Store raw detections separately from tracked/derived output.
-8. All inferences require confidence and evidence.
-9. Keep tournament coordinates in HUD configuration.
-10. Keep map thresholds and polygons in map configuration.
-11. Add tests and debug artifacts for CV changes.
-12. Preserve the MIT license and upstream attribution.
+Preserve all meaningful existing work and Valoscribe behavior. Never invent source crops, team/side labels, map polygons, round intervals, acceptance metrics, or calibration. Keep source configs' crop/color values in broadcast configuration and map polygons/thresholds in map configuration. Keep raw observations immutable and corrections append-only. No paid API/LLM calls, network test dependencies, or credentials in reports/tests. No push absent separate authorization.
 
-## Required workflow
+## Required phase order
 
-Before coding:
+1. RST-001: inventory and preserve before cleanup.
+2. RST-002: bounded repository organization and checks.
+3. MVP-001 onward only after the RST gates; follow the active specification in order.
 
-1. Identify the active VTA issue.
-2. Inspect relevant existing modules and tests.
-3. State the minimal implementation plan.
-4. Confirm current baseline tests for the affected area.
+For cleanup, never use `git clean`, `git reset --hard`, broad recursive deletion, or an unreviewed data move. Use exact, reversible moves. Do not move or modify the neighboring `../VOD` workspace as part of repository cleanup. Machine-local VODs, configs, runs, annotations, caches, and backups belong under ignored `.local/`.
 
-During coding:
+## Development checks
 
-1. Keep changes reviewable.
-2. Add or update typed Pydantic contracts first when persistent data changes.
-3. Add failure-path behavior, not only the happy path.
-4. Avoid unrelated refactors.
-5. Do not silently change CLI or output formats.
-
-Before completion:
+Before editing a code seam, inspect the existing code and relevant tests. Keep changes narrow, preserve upstream attribution and the MIT license, and do not move stable source merely for visual symmetry. After implementation, run:
 
 ```bash
 uv run pytest
@@ -46,28 +28,4 @@ uv run ruff check src tests
 uv run mypy src/valoscribe
 ```
 
-Use the repository’s actual configured paths if they differ.
-
-## Definition of Done response
-
-Report exactly:
-
-```text
-Issue completed:
-Files changed:
-Behavior added:
-Tests run and results:
-Metrics, if applicable:
-Known limitations:
-Next issue:
-```
-
-## Stop conditions
-
-Do not invent production crop coordinates, map assets, labels, or evaluation results. When a required real fixture is unavailable:
-
-- Implement the interface and synthetic/unit tests.
-- Clearly mark fixture-dependent acceptance criteria as pending.
-- Provide the exact artifact or measurement needed next.
-
-Do not solve missing deterministic evidence by asking an LLM to guess.
+Report command results separately from real-source acceptance. If real fixtures or calibration evidence are missing, say so and do not claim product completion.

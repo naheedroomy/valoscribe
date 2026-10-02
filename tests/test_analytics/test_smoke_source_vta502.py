@@ -41,9 +41,13 @@ class Capture:
 
 
 def _fixture(tmp_path, monkeypatch):
-    data = json.loads(
-        (Path(__file__).parents[2] / "docs/smoke_source_observation_vta502.json").read_text()
+    fixture_path = (
+        Path(__file__).parents[2]
+        / "tests"
+        / "fixtures"
+        / "smoke_source_observation_vta502.json"
     )
+    data = json.loads(fixture_path.read_text())
     frame = np.zeros((1080, 1920, 3), dtype=np.uint8)
     digest = decoded_crop_sha256(frame, evaluator.SmokeSourceObservation.model_validate(data).crop)
     for sample in data["samples"]:
@@ -114,7 +118,7 @@ def test_evaluate_rejects_dimensions_decode_and_hash(tmp_path, monkeypatch):
 
 
 def test_cli_does_not_write_output_when_evaluation_fails(tmp_path, monkeypatch):
-    from scripts import evaluate_smoke_source_vta502 as cli
+    from scripts.maintenance import evaluate_smoke_source_vta502 as cli
 
     output = tmp_path / "result.json"
     monkeypatch.setattr(

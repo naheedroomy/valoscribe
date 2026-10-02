@@ -9,7 +9,7 @@ import pytest
 
 ROOT = Path(__file__).parents[2]
 MANIFEST = ROOT / "src/valoscribe/config/ascent_vta102_correspondence.json"
-DIAGNOSTIC = run_path(str(ROOT / "scripts/diagnose_vta102_ascent_correspondence.py"))
+DIAGNOSTIC = run_path(str(ROOT / "scripts/dev/diagnose_vta102_ascent_correspondence.py"))
 DIAGNOSE = DIAGNOSTIC["diagnose"]
 DIAGNOSTIC_ERROR = DIAGNOSTIC["DiagnosticError"]
 

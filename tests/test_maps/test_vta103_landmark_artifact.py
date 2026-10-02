@@ -12,7 +12,13 @@ ARTIFACT = (
     Path(__file__).parent
     / "../fixtures/registration_landmarks/ascent-vct-americas-stage2-grand-final-vta103.json"
 )
-EVALUATOR = run_path(str(Path(__file__).parents[2] / "scripts/evaluate_minimap_landmarks.py"))
+EVALUATOR_PATH = (
+    Path(__file__).parents[2]
+    / "scripts"
+    / "maintenance"
+    / "evaluate_minimap_landmarks.py"
+)
+EVALUATOR = run_path(str(EVALUATOR_PATH))
 SUMMARIZE_SAMPLES = EVALUATOR["summarize_samples"]
 EVALUATE_MANIFEST = EVALUATOR["evaluate_manifest"]
 MAIN = EVALUATOR["main"]

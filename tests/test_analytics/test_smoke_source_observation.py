@@ -70,7 +70,12 @@ def observation_data() -> dict[str, object]:
 
 
 def test_vta502_source_observation_records_reviewed_values_without_precise_onset() -> None:
-    artifact_path = Path(__file__).parents[2] / "docs/smoke_source_observation_vta502.json"
+    artifact_path = (
+        Path(__file__).parents[2]
+        / "tests"
+        / "fixtures"
+        / "smoke_source_observation_vta502.json"
+    )
     artifact = SmokeSourceObservation.model_validate_json(artifact_path.read_text())
 
     assert artifact.center_source_crop_px == (251, 155)
@@ -185,7 +190,12 @@ def test_crop_hash_rejects_malformed_frame_and_out_of_bounds_crop():
 
 
 def test_independent_review_rejects_duplicate_frame_indices_after_mutation():
-    artifact_path = Path(__file__).parents[2] / "docs/smoke_source_observation_vta502.json"
+    artifact_path = (
+        Path(__file__).parents[2]
+        / "tests"
+        / "fixtures"
+        / "smoke_source_observation_vta502.json"
+    )
     observation = SmokeSourceObservation.model_validate_json(artifact_path.read_text())
     assert observation.independent_visual_review is not None
     review = observation.independent_visual_review

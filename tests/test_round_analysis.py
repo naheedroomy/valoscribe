@@ -247,7 +247,7 @@ def test_diagnostic_only_output_has_matching_json_and_markdown_inventory(tmp_pat
 
 def test_real_vta404_diagnostic_only_bundle_has_json_markdown_parity(tmp_path: Path) -> None:
     root = Path(__file__).resolve().parents[1]
-    bundle_path = root / "docs/vta704-example/diagnostic-only-bundle.json"
+    bundle_path = root / "examples/tactical_mvp/vta704/diagnostic-only-bundle.json"
     evidence = RoundAnalysisBundle.model_validate_json(bundle_path.read_bytes())
     result, diagnostic_reports = build_round_analysis(evidence, bundle_path)
     assert result.sample_round_count == 0

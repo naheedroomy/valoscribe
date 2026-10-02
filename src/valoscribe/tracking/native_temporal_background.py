@@ -618,7 +618,10 @@ def _compute_code_sha256() -> str:
     code_paths = [
         Path(__file__),
         Path(__file__).parents[1] / "detectors" / "portrait_center_localizer.py",
-        Path(__file__).parents[3] / "scripts" / "run_vta304_native_temporal_background.py",
+        Path(__file__).parents[3]
+        / "scripts"
+        / "dev"
+        / "run_vta304_native_temporal_background.py",
     ]
     return _sha(b"".join(path.read_bytes() for path in code_paths))
 
