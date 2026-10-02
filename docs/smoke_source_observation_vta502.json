@@ -1,0 +1,232 @@
+{
+  "schema_version": "1.0",
+  "source_filename": "YTDown.com_YouTube_Media_4LEGEQ8KBS0_100T-vs-LOUD-VCT-Americas-Stage-2-Playoffs-Grand-Final-Map-3-Ascent_001_1080p.mp4",
+  "source_frame_width": 1920,
+  "source_frame_height": 1080,
+  "nominal_fps": 60.0,
+  "crop": {
+    "x": 70,
+    "y": 50,
+    "width": 360,
+    "height": 400
+  },
+  "first_present_timestamp_s": 2489.75,
+  "last_present_timestamp_s": 2505.133333,
+  "first_absent_after_present_timestamp_s": 2505.366667,
+  "boundary_uncertainty_s": 0.25,
+  "onset_last_unsettled_timestamp_s": 2489.5,
+  "onset_first_persistent_timestamp_s": 2489.75,
+  "end_last_present_timestamp_s": 2505.133333,
+  "end_first_clearly_absent_timestamp_s": 2505.366667,
+  "maximum_timing_uncertainty_s": 0.3,
+  "center_source_crop_px": [
+    251,
+    155
+  ],
+  "center_tolerance_px": 3,
+  "center_is_approximate": true,
+  "agent_attribution": "UNKNOWN",
+  "independent_visual_review": {
+    "review_status": "VISUAL_APPEARANCE_ONLY_IDENTITY_UNRESOLVED",
+    "smoke_identity": "UNRESOLVED",
+    "smoke_plausibility": "MODERATE",
+    "caster_attribution": "UNKNOWN",
+    "interpretation": "EXPLORATORY_VISUAL_FOOTPRINT_CANDIDATE_ONLY",
+    "evidence": [
+      {
+        "timestamp_s": 2487.75,
+        "description": "Teal-rimmed dark circle not visible.",
+        "center_source_crop_px": null,
+        "decoded_crop_sha256": "8c312f8e57b740e65b849acb5dad30367f93a6309d06c5166eea4f9d40ca69ed",
+        "frame_index": 149265
+      },
+      {
+        "timestamp_s": 2488.0,
+        "description": "Teal-rimmed dark circle visible near (267,160).",
+        "center_source_crop_px": [
+          267,
+          160
+        ],
+        "decoded_crop_sha256": "1cf833a25f902275e7006fe677cae338dcb311438befbb6c4347e75fb9cbf3da",
+        "frame_index": 149280
+      },
+      {
+        "timestamp_s": 2488.25,
+        "description": "Teal-rimmed dark circle continues; center shifts toward (253,154).",
+        "center_source_crop_px": [
+          253,
+          154
+        ],
+        "decoded_crop_sha256": "3977deb4cafa86ce0f6e64c6f088ed2e264cbfe66070f97bb7c6ebefc0a8f8b5",
+        "frame_index": 149295
+      },
+      {
+        "timestamp_s": 2488.5,
+        "description": "Teal-rimmed dark circle visible near (253,154).",
+        "center_source_crop_px": [
+          253,
+          154
+        ],
+        "decoded_crop_sha256": "3de8974d5de910e8d68fa117309ffdeec1f7082880c4feb2da6102e8970ea713",
+        "frame_index": 149310
+      },
+      {
+        "timestamp_s": 2488.75,
+        "description": "Teal-rimmed dark circle visible near (253,154).",
+        "center_source_crop_px": [
+          253,
+          154
+        ],
+        "decoded_crop_sha256": "de5416ad891e5f6d80c0a4fcfb34855c7c877366c9987ae3fd8aebd0e2ca77ec",
+        "frame_index": 149325
+      },
+      {
+        "timestamp_s": 2489.0,
+        "description": "Teal-rimmed dark circle visible near (253,154).",
+        "center_source_crop_px": [
+          253,
+          154
+        ],
+        "decoded_crop_sha256": "18aa5fc0c8411277104f1a21831cf6ba5430d79d3412437cc3e2dbeed7be6ce7",
+        "frame_index": 149340
+      },
+      {
+        "timestamp_s": 2489.25,
+        "description": "Teal-rimmed dark circle visible near (253,154).",
+        "center_source_crop_px": [
+          253,
+          154
+        ],
+        "decoded_crop_sha256": "6e9b4e954a33147bee8d0f2c3144917a16628b3d1e7b3efc53487d214bb37e16",
+        "frame_index": 149355
+      },
+      {
+        "timestamp_s": 2489.5,
+        "description": "Teal-rimmed dark circle remains visible near (253,154).",
+        "center_source_crop_px": [
+          253,
+          154
+        ],
+        "decoded_crop_sha256": "83e28d6eb75ad8fb67eece4cb04b9d16eef258b6a677f91f0f76437f254ae7b6",
+        "frame_index": 149370
+      },
+      {
+        "timestamp_s": 2489.75,
+        "description": "Faint gray circular footprint appears near (251,155); rendered appearance changes with ADS. Relation to earlier teal-rimmed circle is unresolved.",
+        "center_source_crop_px": [
+          251,
+          155
+        ],
+        "decoded_crop_sha256": "c51ad482c467f90600e0bd8cb03bc78d0c707906b40a1c59231e7eca13fa72df",
+        "frame_index": 149385
+      },
+      {
+        "timestamp_s": 2490.0,
+        "description": "Faint gray circular footprint visible near (251,155); smoke identity remains unverified.",
+        "center_source_crop_px": [
+          251,
+          155
+        ],
+        "decoded_crop_sha256": "d17a25b6775bd699d4ecfac5254a9d93ae85fec10a920296918627bc1ac77efe",
+        "frame_index": 149400
+      },
+      {
+        "timestamp_s": 2505.0,
+        "description": "Faint gray circular footprint visible near (251,155); no continuous duration is established by sparse samples.",
+        "center_source_crop_px": [
+          251,
+          155
+        ],
+        "decoded_crop_sha256": "ffc2b97d79a624d733eb44c6e5f497ab8bec4ad6bf4364d1a4a66d823ce2e9b9",
+        "frame_index": 150300
+      }
+    ],
+    "caveats": [
+      "The observed feature is an appearance, not ground-truth smoke.",
+      "The relation between the teal-rimmed circle and faint gray footprint is unresolved.",
+      "No exact smoke onset, continuous smoke duration, or accepted smoke precision/recall is established.",
+      "Original sample kinds and timing bounds below are preserved as historical reviewer assertions, not reconciled smoke labels."
+    ]
+  },
+  "canonical_map_point": null,
+  "canonical_registration_status": "pending",
+  "samples": [
+    {
+      "timestamp_s": 2487.0,
+      "frame_index": 149220,
+      "kind": "absent",
+      "review_note": "Independent review: feature absent; earlier than first persistent presence at 2489.75s.",
+      "decoded_crop_sha256": "4a1f562b75915b9a2229bb860ae64441bdabb59975ca7e5b51f12453c036ef9f"
+    },
+    {
+      "timestamp_s": 2488.0,
+      "frame_index": 149280,
+      "kind": "unsettled",
+      "review_note": "Independent review: feature unsettled/ambiguous; does not establish onset.",
+      "decoded_crop_sha256": "1cf833a25f902275e7006fe677cae338dcb311438befbb6c4347e75fb9cbf3da"
+    },
+    {
+      "timestamp_s": 2489.0,
+      "frame_index": 149340,
+      "kind": "unsettled",
+      "review_note": "Independent review: feature unsettled/ambiguous; does not establish onset.",
+      "decoded_crop_sha256": "18aa5fc0c8411277104f1a21831cf6ba5430d79d3412437cc3e2dbeed7be6ce7"
+    },
+    {
+      "timestamp_s": 2489.5,
+      "frame_index": 149370,
+      "kind": "unsettled",
+      "review_note": "Independent review: last unsettled frame before persistent smoke onset.",
+      "decoded_crop_sha256": "83e28d6eb75ad8fb67eece4cb04b9d16eef258b6a677f91f0f76437f254ae7b6"
+    },
+    {
+      "timestamp_s": 2489.75,
+      "frame_index": 149385,
+      "kind": "present",
+      "review_note": "Independent reviewer inspected this unannotated raw crop: feature present; approximate center (251,155) ±3 source-crop pixels. First persistent smoke frame; exact onset remains bracketed. ±2 precision is unsupported.",
+      "decoded_crop_sha256": "c51ad482c467f90600e0bd8cb03bc78d0c707906b40a1c59231e7eca13fa72df"
+    },
+    {
+      "timestamp_s": 2490.0,
+      "frame_index": 149400,
+      "kind": "present",
+      "review_note": "Independent reviewer inspected this unannotated raw crop: feature present; approximate center (251,155) ±3 source-crop pixels. Persistent presence confirmed; first persistent frame is 2489.75s. ±2 precision is unsupported.",
+      "decoded_crop_sha256": "d17a25b6775bd699d4ecfac5254a9d93ae85fec10a920296918627bc1ac77efe"
+    },
+    {
+      "timestamp_s": 2505.0,
+      "frame_index": 150300,
+      "kind": "present",
+      "review_note": "Independent reviewer inspected this unannotated raw crop: feature present; approximate center (251,155) ±3 source-crop pixels. Presence continued beyond this sample. ±2 precision is unsupported.",
+      "decoded_crop_sha256": "ffc2b97d79a624d733eb44c6e5f497ab8bec4ad6bf4364d1a4a66d823ce2e9b9"
+    },
+    {
+      "timestamp_s": 2505.133333,
+      "frame_index": 150308,
+      "kind": "present",
+      "review_note": "Independent reviewer inspected this unannotated raw crop: feature present; approximate center (251,155) ±3 source-crop pixels. Last present frame before disappearance. ±2 precision is unsupported.",
+      "decoded_crop_sha256": "eb74b644d38d0ca70e99e64ce8e8a4c48e8341bba8694e007d0499b6ef08a942"
+    },
+    {
+      "timestamp_s": 2505.25,
+      "frame_index": 150315,
+      "kind": "unsettled",
+      "review_note": "Independent review: ambiguous transition frame.",
+      "decoded_crop_sha256": "fe9270bd5e14ecfd8a99c4b0968faf88e2524e85fc2318b20af6ee4282209421"
+    },
+    {
+      "timestamp_s": 2505.366667,
+      "frame_index": 150322,
+      "kind": "absent",
+      "review_note": "Independent review: first clearly absent frame.",
+      "decoded_crop_sha256": "726da755aa5d14091056682b3eca581b9c5182ea1781fa02d17ff97481dfba9d"
+    },
+    {
+      "timestamp_s": 2506.0,
+      "frame_index": 150360,
+      "kind": "absent",
+      "review_note": "Independent review: feature absent; later than first clearly absent frame at 2505.366667s.",
+      "decoded_crop_sha256": "09461e6d7e7fadb805421ebc3d846ae16c1d2b3ced2d728b2bb58751165e6316"
+    }
+  ]
+}

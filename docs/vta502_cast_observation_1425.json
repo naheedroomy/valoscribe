@@ -1,0 +1,159 @@
+{
+  "schema_version": "1.0",
+  "observation_id": "vta502-ascent-100t-bang-omen-dark-cover-cast-1423.4-1425.4",
+  "source_video_path": "/Users/naheedroomy/Documents/valorant-analyzer/VOD/YTDown.com_YouTube_Media_4LEGEQ8KBS0_100T-vs-LOUD-VCT-Americas-Stage-2-Playoffs-Grand-Final-Map-3-Ascent_001_1080p.mp4",
+  "source_video_filename": "YTDown.com_YouTube_Media_4LEGEQ8KBS0_100T-vs-LOUD-VCT-Americas-Stage-2-Playoffs-Grand-Final-Map-3-Ascent_001_1080p.mp4",
+  "source_video_sha256": "a2feb25b842b6c1c2baa17f8ef0c5ecfe1816bd058a1c256350fa95900454c44",
+  "source_frame_dimensions_wh": [
+    1920,
+    1080
+  ],
+  "nominal_fps": 60.0,
+  "source_acquisition_manifest_path": "/tmp/vta502-cast1425-review/manifest.json",
+  "source_crop_rect_xywh": [
+    70,
+    50,
+    360,
+    400
+  ],
+  "observation_kind": "reviewed_cast_observation",
+  "observed_player": "bang",
+  "observed_agent": "Omen",
+  "observed_ability": "Dark Cover",
+  "confidence": 0.95,
+  "confidence_basis": "Independent observer reports continuous 100T bang Omen targeting-to-release view; timed source frames and decoded-frame/crop hashes identify the cited source evidence.",
+  "events": [
+    {
+      "event_id": "targeting-entry",
+      "start_timestamp_s": 1423.4,
+      "end_timestamp_s": 1423.5,
+      "description": "Omen targeting entry bracket.",
+      "evidence_frame_indices": [
+        85404,
+        85410
+      ]
+    },
+    {
+      "event_id": "dark-cover-preview",
+      "start_timestamp_s": 1423.7,
+      "end_timestamp_s": 1424.8,
+      "description": "Cyan Dark Cover preview visible through this interval.",
+      "evidence_frame_indices": [
+        85422,
+        85488
+      ]
+    },
+    {
+      "event_id": "release-transition",
+      "start_timestamp_s": 1424.8,
+      "end_timestamp_s": 1424.9,
+      "description": "Preview closes and the observed HUD bar changes from yellow to gray during the targeting/release transition; the timer change is not count evidence.",
+      "evidence_frame_indices": [
+        85488,
+        85494
+      ]
+    },
+    {
+      "event_id": "post-release-glove",
+      "start_timestamp_s": 1425.0,
+      "end_timestamp_s": 1425.0,
+      "description": "Open glove visible.",
+      "evidence_frame_indices": [
+        85500
+      ]
+    },
+    {
+      "event_id": "world-view-return",
+      "start_timestamp_s": 1425.1,
+      "end_timestamp_s": 1425.1,
+      "description": "World view returns.",
+      "evidence_frame_indices": [
+        85506
+      ]
+    },
+    {
+      "event_id": "observer-cut",
+      "start_timestamp_s": 1425.3,
+      "end_timestamp_s": 1425.4,
+      "description": "Observer cuts to Vora; no later caster evidence.",
+      "evidence_frame_indices": [
+        85518,
+        85524
+      ]
+    }
+  ],
+  "evidence_frames": [
+    {
+      "timestamp_s": 1423.4,
+      "frame_index": 85404,
+      "full_frame_bgr_sha256": "964ad5bb792876971ceef53d2f6763b5a23515c06edbd534783ba40a53f9ef78",
+      "minimap_crop_bgr_sha256": "753ca5cf1b74570199c2f57b178ef7ae61ed2f22e67cb655374bc5c4aea5ecea",
+      "description": "Targeting entry is visible; lower HUD shows Omen Dark Cover interaction."
+    },
+    {
+      "timestamp_s": 1423.5,
+      "frame_index": 85410,
+      "full_frame_bgr_sha256": "66b3f2e547cebdaa833666c5f0bc10543905c0fb592bb98a56c6a91b76349a44",
+      "minimap_crop_bgr_sha256": "789ea763607ddeb977f7b24fa0048d30f29a3e1b8b2e54975f8107b73e82d6e1",
+      "description": "Targeting state continues at the reviewed bracket boundary."
+    },
+    {
+      "timestamp_s": 1423.7,
+      "frame_index": 85422,
+      "full_frame_bgr_sha256": "45594cb3bc39d1eaadb28c4e7264d01c4a94bbfe6960890a2bc3eb37657f82b5",
+      "minimap_crop_bgr_sha256": "0b5453a7e4f9b1a515862493775480286270ce7aae1b8c696933d689f88bba89",
+      "description": "Cyan Dark Cover targeting preview is visible."
+    },
+    {
+      "timestamp_s": 1424.8,
+      "frame_index": 85488,
+      "full_frame_bgr_sha256": "b965d6a2d0d2228318808347f461f6ec0dc43ec96bdd748ca629712fc16ef21a",
+      "minimap_crop_bgr_sha256": "a142a672ab8d95e546e63470881409bde20cb5d3a9640e0fa1c8e4b9877566aa",
+      "description": "Preview closes; the left HUD bar is observed changing from yellow to gray during the targeting/release transition."
+    },
+    {
+      "timestamp_s": 1424.9,
+      "frame_index": 85494,
+      "full_frame_bgr_sha256": "53fbe5ed6622ed1df8a1f1357a5e193e00eca648ab81eccf9e9df35cb4a83e1e",
+      "minimap_crop_bgr_sha256": "d3bd584129e263523e4474636af01ce8805ddf6865a22ba8056c760f3b711e03",
+      "description": "Post-release state; transition bracket closes."
+    },
+    {
+      "timestamp_s": 1425.0,
+      "frame_index": 85500,
+      "full_frame_bgr_sha256": "161d892e163910019da207acc0f524adfbff74bb64dd5833253955e8a324d113",
+      "minimap_crop_bgr_sha256": "beb93d7ecb1cf8d34298d1b3eabb8948de048d5614ccb3607f227873d6ef3a40",
+      "description": "Open glove is visible after release."
+    },
+    {
+      "timestamp_s": 1425.1,
+      "frame_index": 85506,
+      "full_frame_bgr_sha256": "b92b0a00a138010a12bd8ce3bd59951df60dd0c6f2d915e7d5fc88b237d118ad",
+      "minimap_crop_bgr_sha256": "63864381f5b8260bb206cd13c3a84122a974c082d988804336a0607a02e037cf",
+      "description": "World view returns."
+    },
+    {
+      "timestamp_s": 1425.3,
+      "frame_index": 85518,
+      "full_frame_bgr_sha256": "be2d49958a33bd32ab0e06ae0a88947f1fd245ae3ef1507de6f05ef7df56627c",
+      "minimap_crop_bgr_sha256": "e01fcdf245d9ea08e97fb2b4e65ebd08110577140781e5a43ed35bff82801466",
+      "description": "Observer camera has cut to Vora."
+    },
+    {
+      "timestamp_s": 1425.4,
+      "frame_index": 85524,
+      "full_frame_bgr_sha256": "2d1aa6a8f992d5435f28cd5e7150452d01c20b8b66be84863965f6518be16fbc",
+      "minimap_crop_bgr_sha256": "95cbd43f722e0f9a8be62603466b636b13c6ec80b49be17069f63f3c16291374",
+      "description": "Observer remains on Vora; attribution evidence ends."
+    }
+  ],
+  "smoke_footprint_observation": {
+    "status": "unresolved",
+    "center": null,
+    "world_smoke_deployment": "unknown",
+    "smoke_lifecycle": "unknown",
+    "caster_to_footprint_correspondence": "unknown",
+    "minimap_correspondence": "unknown"
+  },
+  "not_a_smoke_label": true
+}

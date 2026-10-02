@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0",
+  "artifact_path": "/tmp/vta304-supervised-crop-diagnostic",
+  "status": "historical_audit_sidecar_only",
+  "historical_artifacts_modified_or_rerun": false,
+  "manifest_original_bytes": "unavailable; current artifact bytes are audited, no reconstruction is claimed",
+  "policy_digest_discrepancy": {
+    "manifest_policy_sha256": "94addfb67a411e525644bcbee9a97c05453cfff3b4332f1e339aec9d0be40d82",
+    "sha256_of_actual_persisted_policy_json_bytes": "eb61ed79d208e4ae8f1768186b8ecda64e56efdc0cc2695063895c02dec1ccd2",
+    "finding": "historical manifest hashes a different serialization than the exact persisted policy bytes"
+  },
+  "known_post_freeze_amendment_and_exposure": {
+    "evaluation_blinding_and_acceptance_fields": "known to have been added after prediction freeze; current manifest presence does not prove they were emitted at freeze time",
+    "strict_freeze_before_gold": false,
+    "developer_gold_exposure": true,
+    "programmatic_input_separation": true,
+    "early_gold_exposure": "gold fixture was opened before predictions froze; the historical run was not blinded"
+  },
+  "historical_seed_source_binding": "pending; source/frame/crop raster binding was not recorded or measured; no hash inferred",
+  "current_artifact_sha256": {
+    "policy.json": "eb61ed79d208e4ae8f1768186b8ecda64e56efdc0cc2695063895c02dec1ccd2",
+    "predictions.jsonl": "2ac21c6b14dd3a08430d14c40cf0e2be1164e59d080eba3d678e26bf13296021",
+    "raw_detections.jsonl": "cc2c05c5ebce578962a6e71907efcd57254516b5312c016b12938a56e46f20e7",
+    "manifest.json": "35f09159926429c27853d3679aae2140763aab92cb751cba3d76ec569085a831",
+    "run_metadata.json": "fbe140ef44de0cfb55492500778d80a6a43d5b965be90fbdee066c4fbfb9f714"
+  },
+  "historical_accuracy": {
+    "predictions_preserved": true,
+    "at_300s_301s_302s": "one abstention; 301s and 302s associations remain about 10px outside the approximate +/-5px per-axis scoring assumption",
+    "identity_or_vta304_acceptance_claim": false
+  },
+  "scoring": {
+    "policy": "approximate +/-5px per-axis assumption supplied for isolated scoring; not a gold-fixture field",
+    "eligibility": "exact frame index and decoded BGR crop hash must match fixture; otherwise pending, not a nonmatch",
+    "historical_evaluator_status": "pending_raster_binding",
+    "unmatched_visible_label_frame_indices": [18000, 18060, 18120],
+    "evaluation_input_sha256": {
+      "fixture": "17a9bc76104132aaa52cf2de9213336f108f9ea845a67a597f06c6074988b17e",
+      "manifest": "35f09159926429c27853d3679aae2140763aab92cb751cba3d76ec569085a831",
+      "predictions": "2ac21c6b14dd3a08430d14c40cf0e2be1164e59d080eba3d678e26bf13296021",
+      "raw_detections": "cc2c05c5ebce578962a6e71907efcd57254516b5312c016b12938a56e46f20e7",
+      "scoring_policy": "3751918aa55b4550014bf6644b0a5593a3fab9454db3fa2c8dcd3e4c9f4e737d"
+    },
+    "metrics": null
+  }
+}

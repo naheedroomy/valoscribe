@@ -1,0 +1,151 @@
+{
+  "schema_version": "1.0",
+  "purpose": "Review provenance and uncertainty fields not represented in the existing PlayerIdentityObservation typed contract.",
+  "review": {
+    "reviewer": "Independent Sol observer; see v2-reference-source-labels.md for qualitative source review report.",
+    "report_path": "/Users/naheedroomy/.pi/agent/sessions/--Users-naheedroomy-Documents-valorant-analyzer--/subagent-artifacts/outputs/2b270364-c396-4b0c-82c3-a879fe7fd651/v2-reference-source-labels.md",
+    "method": "Reviewed each supplied unannotated full-frame and minimap-crop PNG independently; no tracker predictions, overlays, prior labels, or policy output used.",
+    "status": "exposed development review; not blinded gold or full-round acceptance",
+    "coordinate_convention": "Approximate minimap portrait-marker center in configured 360x400 crop pixels; exclude protruding direction indicator.",
+    "confidence_convention": "Identity and position confidence values are subjective reviewer judgments, not calibrated probabilities.",
+    "scope_limit": "Six sampled frames only; no interpolation or claim about intervening movement, full-round coverage, canonical map coordinates, or accuracy upgrade."
+  },
+  "source_capture": {
+    "manifest_path": "tmp/vta304-v2-reference-rasters/manifest.json",
+    "capture_only": true,
+    "complete_stream_verified": false,
+    "reader": "valoscribe.video.pts_reader.SequentialPtsVideoSource",
+    "sequential_no_seek": true,
+    "source_video_sha256": "a2feb25b842b6c1c2baa17f8ef0c5ecfe1816bd058a1c256350fa95900454c44",
+    "crop": {
+      "x": 70,
+      "y": 50,
+      "width": 360,
+      "height": 400
+    },
+    "frames": [
+      {
+        "frame_index": 18000,
+        "source_pts": 4608000,
+        "timestamp_seconds": 300.0,
+        "source_video_sha256": "a2feb25b842b6c1c2baa17f8ef0c5ecfe1816bd058a1c256350fa95900454c44",
+        "full_bgr_sha256": "0f39979e31864f9564689257e42444638102faf2bf53f23d5f8ecac1afb9e5a9",
+        "crop_bgr_sha256": "fbf9e28fe398f2c34f8e371ce32cb78f23c61acb073ecffd3b1365dad95b4b20",
+        "fullframe_png_sha256": "ca77d0d5b61cad198ab23dc48952e1d5849f791fa04f43b01ba988d79d9ed40f",
+        "crop_png_sha256": "77c66560b0bda059448045548d691039b3d5a676e37127e6caef5bfb614d85ea"
+      },
+      {
+        "frame_index": 18001,
+        "source_pts": 4608256,
+        "timestamp_seconds": 300.01666666666665,
+        "source_video_sha256": "a2feb25b842b6c1c2baa17f8ef0c5ecfe1816bd058a1c256350fa95900454c44",
+        "full_bgr_sha256": "4ffacab40d91dfe1132245e58f7cc4867331fb619fb3f641d7c36c5fe1a08e39",
+        "crop_bgr_sha256": "97ad46a170eea7f22ec0709dd59af67298aa8fe09ceea3337484ec568891074f",
+        "fullframe_png_sha256": "a31dc0f806ba9dfe6e70daea596ec929bdab879c78a8d6aa980a610f6d06e7ee",
+        "crop_png_sha256": "d9f20f68a699d5628142a8b8910e5ccbe5fae040924e39ee8a733eca2dd1f38a"
+      },
+      {
+        "frame_index": 18002,
+        "source_pts": 4608512,
+        "timestamp_seconds": 300.03333333333336,
+        "source_video_sha256": "a2feb25b842b6c1c2baa17f8ef0c5ecfe1816bd058a1c256350fa95900454c44",
+        "full_bgr_sha256": "9323cb30fe7ed873ddd03bcd0d87a4e58ab98c13ed8344341e0b1a1da7cb52e4",
+        "crop_bgr_sha256": "a83e0fc48d74ea68247a4b963e2cf08254107212a6c462b59f2cf637f32301d8",
+        "fullframe_png_sha256": "4e5800a96c063c0bf250b72045836429f0428761ec39dc0962fe1ce7ee404696",
+        "crop_png_sha256": "c3f1ba6bb610276ee1b853e028ed4d91763e50c6d61e710ceaf9656474137fbb"
+      },
+      {
+        "frame_index": 18060,
+        "source_pts": 4623360,
+        "timestamp_seconds": 301.0,
+        "source_video_sha256": "a2feb25b842b6c1c2baa17f8ef0c5ecfe1816bd058a1c256350fa95900454c44",
+        "full_bgr_sha256": "692d936cae063bbe2e2024b173a5e08f84fe6aef651e17afe7567b7b8c611511",
+        "crop_bgr_sha256": "46fefb8a1226ef59076609cd6fb50cc6411136772795f043f97b2248083538a3",
+        "fullframe_png_sha256": "c42eeea249bb79563d68a3a26f40895e8de19f6968a3b66321ac4ab4c40fe5ad",
+        "crop_png_sha256": "07969a6c446afff36a7fe0500f3fb42403190687e3a434122788c414a971492c"
+      },
+      {
+        "frame_index": 18120,
+        "source_pts": 4638720,
+        "timestamp_seconds": 302.0,
+        "source_video_sha256": "a2feb25b842b6c1c2baa17f8ef0c5ecfe1816bd058a1c256350fa95900454c44",
+        "full_bgr_sha256": "f84a8e4d9f8c115ef9fd5242816ac7963069382134740fc0034cf5745c2bef56",
+        "crop_bgr_sha256": "0c6433ca43f5994b134f170dda0c6c3e2a7dccfe5643cfe9ee9644cb4376c0b0",
+        "fullframe_png_sha256": "8fe28cf5138058e89871d4efe09fc417a1ec4359ba9d095da08707cceef5186f",
+        "crop_png_sha256": "ac1a3f6e5b3ac8ef403f00a3c6abf711c8a6824adf7c9d14dad939fc33981ac4"
+      },
+      {
+        "frame_index": 18121,
+        "source_pts": 4638976,
+        "timestamp_seconds": 302.01666666666665,
+        "source_video_sha256": "a2feb25b842b6c1c2baa17f8ef0c5ecfe1816bd058a1c256350fa95900454c44",
+        "full_bgr_sha256": "f1824a32c1e058267fd99d772a8ff8e8b1e8d6922fd46205281ac149ea11b6a6",
+        "crop_bgr_sha256": "0545dccb04c3ac1763cf72a6e9660bd032b906853e8141c4b51a4863dd7585d0",
+        "fullframe_png_sha256": "8c0d8d146208f7232bde61b200c8cb657894857202f673bda1cc2954a4db1222",
+        "crop_png_sha256": "8a5d64c837847879be0fab6920a2970930529f5013fb1f47d84c9acbe8f367e1"
+      }
+    ]
+  },
+  "samples": [
+    {
+      "frame_index": 18000,
+      "coordinate_uncertainty_px_each_axis": [
+        3,
+        3
+      ],
+      "identity_confidence_subjective_uncalibrated": 0.96,
+      "position_confidence_subjective_uncalibrated": 0.92,
+      "visible_evidence": "Same-frame HUD names bang, displays Omen and live HP/armor; distinct minimap Omen portrait in blue hood and bright facial slits."
+    },
+    {
+      "frame_index": 18001,
+      "coordinate_uncertainty_px_each_axis": [
+        3,
+        3
+      ],
+      "identity_confidence_subjective_uncalibrated": 0.96,
+      "position_confidence_subjective_uncalibrated": 0.92,
+      "visible_evidence": "Same-frame HUD names bang, displays Omen and live HP/armor; distinct minimap Omen portrait in blue hood and bright facial slits."
+    },
+    {
+      "frame_index": 18002,
+      "coordinate_uncertainty_px_each_axis": [
+        3,
+        3
+      ],
+      "identity_confidence_subjective_uncalibrated": 0.96,
+      "position_confidence_subjective_uncalibrated": 0.92,
+      "visible_evidence": "Same-frame HUD names bang, displays Omen and live HP/armor; distinct minimap Omen portrait in blue hood and bright facial slits."
+    },
+    {
+      "frame_index": 18060,
+      "coordinate_uncertainty_px_each_axis": [
+        3,
+        3
+      ],
+      "identity_confidence_subjective_uncalibrated": 0.96,
+      "position_confidence_subjective_uncalibrated": 0.9,
+      "visible_evidence": "Same-frame HUD names bang, displays Omen and live HP/armor; distinct minimap Omen portrait in blue hood and bright facial slits."
+    },
+    {
+      "frame_index": 18120,
+      "coordinate_uncertainty_px_each_axis": [
+        4,
+        3
+      ],
+      "identity_confidence_subjective_uncalibrated": 0.95,
+      "position_confidence_subjective_uncalibrated": 0.87,
+      "visible_evidence": "Same-frame HUD names bang, displays Omen and live HP/armor; recognizable minimap Omen portrait. Nearby dark red marker increases horizontal uncertainty."
+    },
+    {
+      "frame_index": 18121,
+      "coordinate_uncertainty_px_each_axis": [
+        4,
+        3
+      ],
+      "identity_confidence_subjective_uncalibrated": 0.95,
+      "position_confidence_subjective_uncalibrated": 0.87,
+      "visible_evidence": "Same-frame HUD names bang, displays Omen and live HP/armor; recognizable minimap Omen portrait. Nearby dark red marker increases horizontal uncertainty."
+    }
+  ]
+}

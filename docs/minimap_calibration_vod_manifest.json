@@ -1,0 +1,104 @@
+{
+  "schema_version": "1.0",
+  "purpose": "Metadata-only minimap HUD crop/orientation sample manifest",
+  "source_video": {
+    "filename": "YTDown.com_YouTube_Media_4LEGEQ8KBS0_100T-vs-LOUD-VCT-Americas-Stage-2-Playoffs-Grand-Final-Map-3-Ascent_001_1080p.mp4",
+    "availability": "external user-supplied local file; not bundled",
+    "frame_width": 1920,
+    "frame_height": 1080
+  },
+  "candidate_hud_profile": "src/valoscribe/config/ascent_vct_americas_2026_stage2_final_1080p_candidate.json",
+  "measured_candidate_crop": {
+    "x": 70,
+    "y": 50,
+    "width": 360,
+    "height": 400,
+    "observed_map_footprint_approx": {
+      "left": 75,
+      "top": 58,
+      "right_exclusive": 425,
+      "bottom_exclusive": 443
+    },
+    "broadcast_to_catalog_orientation": "rotate_90_ccw"
+  },
+  "samples": [
+    {
+      "timestamp_seconds": 300,
+      "nominal_frame_index_60fps": 18000,
+      "visible_round": 4,
+      "half": 1,
+      "condition": "live gameplay; spike-carrier-killed banner and killfeed",
+      "registration_method": "affine",
+      "confidence": 0.791,
+      "normalized_mean_absolute_error": 0.157,
+      "accepted": false,
+      "debug_artifacts": "/tmp/valoscribe-vta104-frames/calibration-300/"
+    },
+    {
+      "timestamp_seconds": 600,
+      "nominal_frame_index_60fps": 36000,
+      "visible_round": 6,
+      "half": 1,
+      "condition": "live gameplay; spike-planted banner",
+      "registration_method": "affine",
+      "confidence": 0.469,
+      "normalized_mean_absolute_error": 0.217,
+      "accepted": false,
+      "debug_artifacts": "/tmp/valoscribe-vta104-frames/calibration-600/"
+    },
+    {
+      "timestamp_seconds": 840,
+      "nominal_frame_index_60fps": 50400,
+      "visible_round": 7,
+      "half": 1,
+      "condition": "live gameplay; player HUD and action effects",
+      "registration_method": "affine",
+      "confidence": 0.835,
+      "normalized_mean_absolute_error": 0.144,
+      "accepted": false,
+      "debug_artifacts": "/tmp/valoscribe-vta104-frames/calibration-840/"
+    },
+    {
+      "timestamp_seconds": 2460,
+      "nominal_frame_index_60fps": 147600,
+      "visible_round": 19,
+      "half": 2,
+      "condition": "live gameplay; killfeed and signature-ability banner",
+      "registration_method": "affine",
+      "confidence": 0.588,
+      "normalized_mean_absolute_error": 0.153,
+      "accepted": false,
+      "debug_artifacts": "/tmp/valoscribe-vta104-frames/calibration-2460/"
+    },
+    {
+      "timestamp_seconds": 2820,
+      "nominal_frame_index_60fps": 169200,
+      "visible_round": 22,
+      "half": 2,
+      "condition": "live gameplay; killfeed and ability HUD",
+      "registration_method": "affine",
+      "confidence": 0.623,
+      "normalized_mean_absolute_error": 0.165,
+      "accepted": false,
+      "debug_artifacts": "/tmp/valoscribe-vta104-frames/calibration-2820/"
+    },
+    {
+      "timestamp_seconds": 2940,
+      "nominal_frame_index_60fps": 176400,
+      "visible_round": 23,
+      "half": 2,
+      "condition": "live gameplay; killfeed and player HUD",
+      "registration_method": "affine",
+      "confidence": 0.366,
+      "normalized_mean_absolute_error": 0.229,
+      "accepted": false,
+      "debug_artifacts": "/tmp/valoscribe-vta104-frames/calibration-2940/"
+    }
+  ],
+  "acceptance": {
+    "profile_status": "pending",
+    "map_geometry_status": "pending",
+    "registration_thresholds": null,
+    "reason": "Samples support a conservative crop candidate and 90-degree orientation, but do not provide labeled held-out landmarks or verified tactical geometry."
+  }
+}

@@ -1,0 +1,72 @@
+{
+  "schema_version": "1.0",
+  "source_filename": "YTDown.com_YouTube_Media_4LEGEQ8KBS0_100T-vs-LOUD-VCT-Americas-Stage-2-Playoffs-Grand-Final-Map-3-Ascent_001_1080p.mp4",
+  "source_frame_width": 1920,
+  "source_frame_height": 1080,
+  "nominal_fps": 60.0,
+  "crop": {
+    "x": 1815,
+    "y": 703,
+    "width": 25,
+    "height": 37
+  },
+  "player_label": "bang",
+  "observed_agent_label": "Omen",
+  "observed_ability_label": "Dark Cover (third ability slot)",
+  "transition_bracket_start_s": 2488.0,
+  "transition_bracket_end_s": 2489.0,
+  "interpretation": "available_to_unavailable_or_recharging",
+  "remaining_charge_count": null,
+  "unique_caster_attribution": "pending",
+  "canonical_registration_status": "pending",
+  "confidence": 0.9,
+  "confidence_basis": "Independent reviewer verified bright pip on original frame 149280 and dim pip on original frame 149340; the single-frame bracket supports an indicator state transition, not a numeric charge count or cast attribution.",
+  "smoke_source_observation": "smoke_source_observation_vta502.json",
+  "samples": [
+    {
+      "timestamp_s": 2488.0,
+      "frame_index": 149280,
+      "indicator_state": "bright_pip",
+      "decoded_crop_sha256": "bdb0178714431e1ff877281a4a18ad1da08214ce8ffe3fb7731a8e08d67606de",
+      "confidence": 0.9,
+      "review_status": "independently_reviewed",
+      "review_note": "Original-frame ROI: pip visibly bright/present; reviewer placed approximate ROI at x1815–1840,y703–740."
+    },
+    {
+      "timestamp_s": 2489.0,
+      "frame_index": 149340,
+      "indicator_state": "dim_pip",
+      "decoded_crop_sha256": "6ecb39b5b6aba764b2a4cdc6b6c0a8b9cc39a3ca76be6e4f63980f708585731c",
+      "confidence": 0.9,
+      "review_status": "independently_reviewed",
+      "review_note": "Original-frame ROI: pip visibly dim/absent; reviewer reports this state persists through 2505."
+    },
+    {
+      "timestamp_s": 2490.0,
+      "frame_index": 149400,
+      "indicator_state": "dim_pip",
+      "decoded_crop_sha256": "abde72b5c510cd9612c3c499a3d005da731cdc567f904a6f727e161de72f699c",
+      "confidence": 0.9,
+      "review_status": "independently_reviewed",
+      "review_note": "Indicator remains dim while smoke source first-present evidence begins at 2490; temporal coincidence is not unique caster attribution."
+    },
+    {
+      "timestamp_s": 2505.0,
+      "frame_index": 150300,
+      "indicator_state": "dim_pip",
+      "decoded_crop_sha256": "deed4bc852d20df102b873960b0d15bc7b40719ff7bf34d2d8ea05934eb2d15b",
+      "confidence": 0.9,
+      "review_status": "independently_reviewed",
+      "review_note": "Last reported dim-pip sample; smoke source remains present through this timestamp."
+    },
+    {
+      "timestamp_s": 2506.0,
+      "frame_index": 150360,
+      "indicator_state": "bright_pip",
+      "decoded_crop_sha256": "78007b4e889f46cd380a1956a98ef4ce3de1751079b4a419b1954caff4411625",
+      "confidence": 0.9,
+      "review_status": "independently_reviewed",
+      "review_note": "Bright pip returns on original frame as smoke source first-absent evidence begins; this does not prove smoke expiration was caused by this player's ability."
+    }
+  ]
+}

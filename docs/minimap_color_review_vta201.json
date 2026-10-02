@@ -1,0 +1,62 @@
+{
+  "schema_version": "1.0",
+  "dataset_id": "vta201-ascent-vct-americas-stage2-map3-review-v1",
+  "split_policy": "calibration-300 is the sole fit split; calibration-840 is held out before profile selection",
+  "hash_contract": "SHA-256 over decoded OpenCV BGR uint8 crop bytes in C row-major order; dimensions must be 360x400x3",
+  "source_video": "YTDown.com_YouTube_Media_4LEGEQ8KBS0_100T-vs-LOUD-VCT-Americas-Stage-2-Playoffs-Grand-Final-Map-3-Ascent_001_1080p.mp4",
+  "crop_provenance": {
+    "hud_profile": "src/valoscribe/config/ascent_vct_americas_2026_stage2_final_1080p_candidate.json",
+    "x": 70,
+    "y": 50,
+    "width_px": 360,
+    "height_px": 400,
+    "frame_selection": "OpenCV frame index from nominal 60 fps source; crop is source frame [y:450,x:70:430]"
+  },
+  "review_provenance": "Centers independently visually reviewed from the named minimap crops; coordinates are crop pixels with approximately +/-2 px review tolerance. Adjacent-frame review at 300-303s found that the red mark at (75,202) overlaps a static dark mark and moving red icon, so its identity as a live player is unresolved and it is demoted to an inclusive ignore region. Temporal review at 838-843s confirmed all seven existing 840s positive labels. Teal/red are broadcast-color labels only, not teams or sides. Unknown dark circle at (256,263) remains unresolved in both samples and is excluded by an inclusive tight box.",
+  "frames": [
+    {
+      "sample_id": "calibration-300",
+      "split": "train",
+      "source_frame": 18000,
+      "vod_timestamp_s": 300.0,
+      "image_path": "/tmp/valoscribe-vta104-frames/calibration-300/minimap_crop.png",
+      "sha256_decoded_bgr": "e2cb6450dbf287a35fc0a651f943b1d0550e2622bdd536c7196392d1adee87ab",
+      "width_px": 360,
+      "height_px": 400,
+      "reviewed_icons": [
+        {"broadcast_color": "teal", "center_px": [121, 72]},
+        {"broadcast_color": "teal", "center_px": [117, 146]},
+        {"broadcast_color": "teal", "center_px": [92, 165]},
+        {"broadcast_color": "teal", "center_px": [242, 175]},
+        {"broadcast_color": "red", "center_px": [198, 157]},
+        {"broadcast_color": "red", "center_px": [284, 250]}
+      ],
+      "ignore_regions": [
+        {"reason": "overlapped static dark mark and moving red icon; cannot confirm live-player identity from adjacent frames 300-303s", "bounds_px": [68, 194, 85, 211]},
+        {"reason": "unresolved dark circle; not confidently a player icon or background", "bounds_px": [247, 254, 265, 272]}
+      ]
+    },
+    {
+      "sample_id": "calibration-840",
+      "split": "heldout",
+      "source_frame": 50400,
+      "vod_timestamp_s": 840.0,
+      "image_path": "/tmp/valoscribe-vta104-frames/calibration-840/minimap_crop.png",
+      "sha256_decoded_bgr": "762b9e7b668beeb162ce6e8f495b4a7961617f446aea313ba7e54e438cdec322",
+      "width_px": 360,
+      "height_px": 400,
+      "reviewed_icons": [
+        {"broadcast_color": "teal", "center_px": [129, 66]},
+        {"broadcast_color": "teal", "center_px": [293, 84]},
+        {"broadcast_color": "teal", "center_px": [130, 297]},
+        {"broadcast_color": "red", "center_px": [172, 122]},
+        {"broadcast_color": "red", "center_px": [317, 108]},
+        {"broadcast_color": "red", "center_px": [303, 157]},
+        {"broadcast_color": "red", "center_px": [282, 191]}
+      ],
+      "ignore_regions": [
+        {"reason": "unresolved dark circle; not confidently a player icon or background after temporal review of frames 838-843s", "bounds_px": [247, 254, 265, 272]}
+      ]
+    }
+  ]
+}

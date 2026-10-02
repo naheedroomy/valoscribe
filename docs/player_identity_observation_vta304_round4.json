@@ -1,0 +1,84 @@
+{
+  "schema_version": "1.0",
+  "source_filename": "YTDown.com_YouTube_Media_4LEGEQ8KBS0_100T-vs-LOUD-VCT-Americas-Stage-2-Playoffs-Grand-Final-Map-3-Ascent_001_1080p.mp4",
+  "source_frame_width": 1920,
+  "source_frame_height": 1080,
+  "nominal_fps": 60,
+  "crop": {
+    "x": 70,
+    "y": 50,
+    "width": 360,
+    "height": 400
+  },
+  "round_id": "4",
+  "label": {
+    "team_id": "100T",
+    "player_id": "bang",
+    "agent": "Omen",
+    "alive": true,
+    "roster_evidence": "Round 4 full HUD roster identifies 100T bang as Omen and shows bang alive; LOUD Erde is also an Omen but his player panel is greyed/dead. The two rosters therefore make agent identity alone ambiguous.",
+    "icon_link_evidence": "The reviewed blue-hooded Omen minimap icon moves from crop center (283, 250) at 300s through (276, 252) at 301s to (270, 260) at 302s. Same-frame HUD alive/dead contrast supports linking this live moving icon to 100T bang rather than dead LOUD Erde; reviewer visual inspection of movement and HUD contrast provide bounded, not full-round, attribution evidence. No permanent broadcast color-to-team mapping is assumed."
+  },
+  "samples": [
+    {
+      "timestamp_s": 300.0,
+      "frame_index": 18000,
+      "icon_center_crop_px": [
+        283,
+        250
+      ],
+      "visibility": "visible",
+      "decoded_frame_sha256": "c07ac482a6d2f09af79f2bfa0773c09c5431d324c5fc85477000046a640e42eb",
+      "decoded_crop_sha256": "e2cb6450dbf287a35fc0a651f943b1d0550e2622bdd536c7196392d1adee87ab"
+    },
+    {
+      "timestamp_s": 300.01666666666665,
+      "frame_index": 18001,
+      "icon_center_crop_px": null,
+      "visibility": "uncertain",
+      "uncertainty_note": "The consecutive decoded frame has no independently localized icon center; do not infer visibility or identity from adjacent frames.",
+      "decoded_frame_sha256": "15df1dbd9f8118a8e6f281d3cf0d64845d83eddb72892c4cad808c8ebe43d6b4",
+      "decoded_crop_sha256": "a0bfddf85089dd006f2a361936bcd341d89f38d03b2befc1dc34e4398de73abc"
+    },
+    {
+      "timestamp_s": 300.03333333333336,
+      "frame_index": 18002,
+      "icon_center_crop_px": null,
+      "visibility": "uncertain",
+      "uncertainty_note": "The consecutive decoded frame has no independently localized icon center; do not infer visibility or identity from adjacent frames.",
+      "decoded_frame_sha256": "20705f0bdfbb815117cf841672cadfcdfe3162d7466331d66807b09cadd39b2f",
+      "decoded_crop_sha256": "fec78c76ec53da3c1509dcc88bb526a1674103d495c52663916df26942bf2160"
+    },
+    {
+      "timestamp_s": 301.0,
+      "frame_index": 18060,
+      "icon_center_crop_px": [
+        276,
+        252
+      ],
+      "visibility": "visible",
+      "decoded_frame_sha256": "ecf03ca6d3df95cf9155beac46bd2c8f47dec330d42641fe838c5fb99cf7d8ec",
+      "decoded_crop_sha256": "81b927d4c44d4d314870c816a0bf07805a54fa3ab2c15a72b25cd4dfdf3bb42f"
+    },
+    {
+      "timestamp_s": 302.0,
+      "frame_index": 18120,
+      "icon_center_crop_px": [
+        270,
+        260
+      ],
+      "visibility": "visible",
+      "decoded_frame_sha256": "009d1afaea14a11c18f742bdcc5b15393f13840eb58a9b6fb52d125c712a9871",
+      "decoded_crop_sha256": "20e154e775c7c44f406c79ec7d8dd0eb4c5bdb752380ad108ed882c68bbef6a1"
+    },
+    {
+      "timestamp_s": 303.0,
+      "frame_index": 18180,
+      "icon_center_crop_px": null,
+      "visibility": "uncertain",
+      "uncertainty_note": "The 303-second sample has no independently localized icon center; do not infer visibility or identity from adjacent frames.",
+      "decoded_frame_sha256": "ec5d85c9c73e5888e3073a5a30ab89fa9ecb148aeefc0a7c540c94b614c4fa93",
+      "decoded_crop_sha256": "94c2ef4ce0eb7561b7a565d843f7dd8cae6c2775b58f4e0d91b70d993e2c1924"
+    }
+  ]
+}
