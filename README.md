@@ -4,7 +4,7 @@ Valoscribe is an offline VALORANT broadcast-video analyzer. The active milestone
 
 ## Current status
 
-Repository reset RST-001/RST-002 is in progress. The minimap calibration and round-analysis commands below are existing tools, not the requested team-movement product. No five-round real MVP run, selected-team playback, reviewed zone timeline, or accepted tactical summary is currently claimed. See the [active specification](specs/active/MVP_RESET_AND_REPOSITORY_CLEANUP_SPEC.md) and [documentation index](docs/README.md).
+RST-001/RST-002 are accepted. The Ascent crop and approximate zone geometry have parent-agent visual review for manual team-shape development only; this is not user approval, official geometry, or quantitative registration accuracy. MVP-002 now provides offline `tactical inspect` and `tactical analyze` commands and has produced local five-interval candidate playback. Color detections remain unreviewed partial observations; corrections, occupancy exports, deterministic summaries, and full MVP acceptance are not implemented. See the [active specification](specs/active/MVP_RESET_AND_REPOSITORY_CLEANUP_SPEC.md), [calibration evidence](docs/status/mvp001-calibration-candidate.md), and [documentation index](docs/README.md).
 
 ## Setup
 
@@ -16,15 +16,16 @@ uv sync --dev
 
 Source videos and machine-specific run data stay outside Git under `.local/` (ignored). Put source footage in `.local/media/`, local absolute-path configuration in `.local/configs/`, and generated runs in `.local/runs/`. The existing source video, if available, is local workspace data and must not be copied into the repository.
 
-## Verified existing command
+## Offline team-shape commands
 
-The existing CLI help entry point is:
+Configure a local source path under `.local/configs/` and inspect before analysis:
 
 ```bash
-uv run python -m valoscribe --help
+uv run python -m valoscribe tactical inspect --config .local/configs/ascent-team-movement-mvp001.yaml
+uv run python -m valoscribe tactical analyze --config .local/configs/ascent-team-movement-mvp001.yaml
 ```
 
-It lists existing Valoscribe commands, including `minimap` calibration/anonymous diagnostics and `round-analysis` report generation. This command only displays the CLI interface; it does not process a real round or produce MVP movement output. Do not use synthetic VTA-704 examples as real evidence.
+`inspect` writes local calibration artifacts; `analyze` refuses to overwrite an existing run and processes only configured intervals. Output is local under `.local/runs/<run_id>/`. Candidate color detections are not accepted ground truth, partial coverage is not absence evidence, and this command does not produce correction or tactical-summary outputs. See [run instructions](docs/guides/running-team-shape-mvp.md).
 
 ## Development checks
 

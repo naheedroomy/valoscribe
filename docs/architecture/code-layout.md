@@ -24,7 +24,7 @@ The directories above are the existing VTA source home, not proof that their fea
 
 Keep new implementation under the `valoscribe` package. Use specific modules for the active movement slice and avoid moving stable upstream modules only to imitate a diagram. Keep raw observations, append-only corrections, derived occupancy, and reports distinct as required by the active specification. Team-shape output does not imply identity or tracking support.
 
-The active specification's preferred conceptual package is `valoscribe/tactical/`; establish it only when MVP code is implemented and only for components that need a single cohesive home. Do not create duplicate minimap, map, analytics, or reporting implementations that already exist.
+The active team-shape MVP implementation now lives in `src/valoscribe/tactical/` (`config.py`, `contracts.py`, `detection.py`, `pipeline.py`, `cli.py`). It uses the existing package entry point and Typer CLI while preserving legacy commands. This narrow path owns its source-configured crop/color candidate detector and team-shape playback; it does not replace legacy minimap calibration, map registration, tracking, or reporting modules. Machine-specific run configuration and generated calibration/playback artifacts remain under ignored `.local/`.
 
 ## Configuration distinction
 

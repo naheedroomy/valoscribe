@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "run": {
-    "run_id": "ascent-team-movement-mvp001",
+    "run_id": "ascent-team-movement-mvp002-example",
     "description": "Five source-verified partial attack-round intervals; opening windows included, not full rounds.",
     "sample_fps": 4.0,
     "output_root": ".local/runs",
@@ -66,8 +66,8 @@
       {
         "lower": [
           0,
-          50,
-          50
+          100,
+          100
         ],
         "upper": [
           15,
@@ -78,8 +78,8 @@
       {
         "lower": [
           165,
-          50,
-          50
+          100,
+          100
         ],
         "upper": [
           179,
@@ -98,12 +98,15 @@
     "broadcast_color_label": "red (source-specific candidate)"
   },
   "marker_detection": {
-    "status": "candidate_parameters_only",
-    "min_area_px": 5,
-    "max_area_px": 500,
-    "min_confidence": 0.35,
+    "status": "source-tuned candidate only; false positives and misses remain expected",
+    "min_area_px": 12,
+    "max_area_px": 180,
+    "min_confidence": 0.5,
     "morphology_kernel_px": 3,
-    "merge_distance_px": 8
+    "merge_distance_px": 8,
+    "min_circularity": 0.2,
+    "min_aspect_ratio": 0.32,
+    "max_contour_samples": 24
   },
   "rounds": [
     {

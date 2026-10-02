@@ -4,7 +4,7 @@
 
 - [VALORANT MVP Reset v1.0 specification](../specs/active/MVP_RESET_AND_REPOSITORY_CLEANUP_SPEC.md) — the only active implementation specification. It supersedes the earlier broad `PROJECT_SPEC.md` for the current milestone.
 - [Project instructions](../AGENTS.md) — scope lock, evidence policy, and required phase order.
-- [Provisional root README](../README.md) — setup and verified existing CLI entry point. The MVP workflow is not yet implemented or accepted.
+- [Root README](../README.md) — repository setup and CLI overview; the real-round MVP remains in progress.
 
 ## Current system references
 
@@ -20,7 +20,8 @@ These documents describe existing or historical capabilities and do not certify 
 
 ## Guides and examples
 
-- `guides/` is reserved for current operational guides. There is no verified end-to-end tactical MVP guide yet.
+- [Running the team-shape MVP](guides/running-team-shape-mvp.md) — inspect/analyze commands and evidence limitations.
+- [MVP-001 calibration candidate](status/mvp001-calibration-candidate.md) — source-backed intervals and manually reviewed agent candidate geometry; user review remains pending.
 - [Archived synthetic VTA-704 example](../examples/tactical_mvp/vta704/) is a legacy report example, not real tactical evidence.
 
 ## Status and preservation

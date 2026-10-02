@@ -1,6 +1,6 @@
-# MVP-001 calibration candidate — pending review
+# MVP-001 calibration candidate — parent-agent reviewed for development
 
-This is a source-backed, manually measured candidate, not an accepted calibration or product result. RST-001/RST-002 are accepted separately; MVP-001's human visual review gate remains open.
+This is source-backed manual calibration and approximate geometry, not quantitative registration accuracy, official geometry, or human/user approval. RST-001/RST-002 are accepted separately; the parent-agent visual gate permits use for manual team-shape development, while user final review remains pending.
 
 ## Source and source-specific interpretation
 
@@ -22,7 +22,7 @@ The windows include each selected round's opening; none is claimed to be a compl
 | R7 | 790–870 | t=789 shows pre-round 0:00; t=790 shows live 1:39 | partial window includes plant sequence |
 | R9 | 971–1020 | t=971–974 replay/transition (excluded); t=975 first live frame at 1:39 | partial window; R8 omitted because broadcast transitions to crowd/desk around t=930 |
 
-These intervals are source-verified partial windows, not full-round discovery. The three-frame-per-window source contact is `.local/runs/mvp001/calibration/opening-start-contact.jpg`; existing 15-frame full-source and crop contacts are `.local/runs/mvp001/calibration/revised-five-interval-full-contact.jpg` and `.local/runs/mvp001/calibration/revised-five-interval-crop-contact.jpg` (beginning/middle/end of the revised windows).
+These intervals are source-verified partial windows, not full-round discovery. The exact timer/replay checks are `.local/runs/mvp001/calibration/r4-r6-exact-live-starts.jpg` and `.local/runs/mvp001/calibration/r7-r9-exact-live-gaps.jpg`. Revised 15-frame full-source and crop contacts are `.local/runs/mvp001/calibration/revised-five-interval-full-contact.jpg` and `.local/runs/mvp001/calibration/revised-five-interval-crop-contact.jpg` (beginning/middle/end of the revised windows).
 
 ## Candidate transform
 

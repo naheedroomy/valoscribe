@@ -20,6 +20,7 @@ from valoscribe.commands import (
     scrape,
     utils,
 )
+from valoscribe.tactical.cli import app as tactical_app
 
 app = typer.Typer(
     name="valoscribe",
@@ -35,6 +36,7 @@ app.add_typer(orchestrate.app, name="orchestrate")
 app.add_typer(minimap.app, name="minimap")
 app.add_typer(scenario.app, name="scenario")
 app.add_typer(round_analysis.app, name="round-analysis")
+app.add_typer(tactical_app, name="tactical")
 
 # Add utility commands at top level
 app.command()(utils.download)

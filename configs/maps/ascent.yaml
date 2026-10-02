@@ -398,5 +398,11 @@
     "not_official_geometry": true,
     "quantitative_registration_accuracy_claimed": false,
     "user_final_review": "pending"
+  },
+  "zone_assignment": {
+    "boundary_tolerance_px": 2.0,
+    "overlap_policy": "unknown_OTHER",
+    "unmatched_policy": "unknown_OTHER",
+    "deterministic_rule": "Assign only a point strictly inside exactly one zone by more than boundary_tolerance_px; overlapping interiors, near-boundary points, gaps, and black space return unknown / OTHER."
   }
 }
