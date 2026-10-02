@@ -6,9 +6,10 @@ from 1080p Valorant esports broadcast frames based on JSON coordinate configurat
 """
 
 from __future__ import annotations
+
 import json
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any, Dict, List, cast
 
 import cv2
 import numpy as np
@@ -39,7 +40,7 @@ class Cropper:
             raise FileNotFoundError(f"Config file not found: {config_path}")
 
         with open(config_file, 'r') as f:
-            return json.load(f)
+            return cast(Dict[str, Any], json.load(f))
 
     def crop_simple_region(self, frame: np.ndarray, region_name: str) -> np.ndarray:
         """
@@ -64,7 +65,54 @@ class Cropper:
         x2 = min(frame.shape[1], x + width)
         y2 = min(frame.shape[0], y + height)
 
-        return frame[y:y2, x:x2].copy()
+        return cast(np.ndarray, frame[y:y2, x:x2].copy())
+
+    def crop_minimap(self, frame: np.ndarray) -> np.ndarray:
+        """Crop a validated, explicitly dimensioned minimap HUD profile.
+
+        New profiles use top-level ``frame_width``, ``frame_height``, and a
+        ``minimap`` rectangle. Legacy ``regions.minimap`` coordinates remain
+        available through ``crop_simple_region`` and are not treated as
+        calibrated by this method.
+        """
+        profile = self.config.get("minimap")
+        if profile is None:
+            return np.empty((0, 0, 3), dtype=frame.dtype)
+        if not isinstance(profile, dict):
+            raise ValueError("minimap profile must be an object")
+
+        if frame.ndim != 3 or frame.shape[0] <= 0 or frame.shape[1] <= 0:
+            raise ValueError("frame must be a non-empty height-width-channel image")
+        if frame.shape[2] not in (3, 4):
+            raise ValueError("frame must have 3 or 4 color channels")
+
+        frame_width = self.config.get("frame_width")
+        frame_height = self.config.get("frame_height")
+        if (
+            not isinstance(frame_width, int)
+            or isinstance(frame_width, bool)
+            or not isinstance(frame_height, int)
+            or isinstance(frame_height, bool)
+            or frame_width <= 0
+            or frame_height <= 0
+        ):
+            raise ValueError("minimap profiles require positive integer frame dimensions")
+        if frame.shape[1] != frame_width or frame.shape[0] != frame_height:
+            raise ValueError(
+                f"frame dimensions {frame.shape[1]}x{frame.shape[0]} do not match "
+                f"profile {frame_width}x{frame_height}"
+            )
+
+        coordinates = tuple(profile.get(key) for key in ("x", "y", "width", "height"))
+        if any(not isinstance(value, int) or isinstance(value, bool) for value in coordinates):
+            raise ValueError("minimap rectangle coordinates and dimensions must be integers")
+        x, y, width, height = cast(tuple[int, int, int, int], coordinates)
+        if x < 0 or y < 0 or width <= 0 or height <= 0:
+            raise ValueError("minimap rectangle must have non-negative origin and positive size")
+        if x + width > frame_width or y + height > frame_height:
+            raise ValueError("minimap rectangle is outside the configured frame")
+
+        return cast(np.ndarray, frame[y:y + height, x:x + width].copy())
 
     def crop_killfeed(self, frame: np.ndarray) -> List[np.ndarray]:
         """
@@ -99,7 +147,7 @@ class Cropper:
         individual_height = killfeed["individual_height"]
         offset = killfeed["offset"]
 
-        entries = []
+        entries: List[np.ndarray] = []
         current_y = 0
 
         for i in range(10):
@@ -143,17 +191,17 @@ class Cropper:
         # LEFT side: players 0-4
         left_players = self._crop_side_players(frame, player_info, individual_info)
         for player in left_players:
-            player["side"] = "left"
+            player["side"] = "left"  # type: ignore[assignment]
 
         # RIGHT side: players 5-9
         # Mirror frame horizontally to access right side using same coordinates
         mirrored_frame = cv2.flip(frame, 1)
         right_players = self._crop_side_players(mirrored_frame, player_info, individual_info)
 
-        # Flip player_name, health, and armor back for right side players (text needs to be readable)
+        # Flip text crops for right-side players so they are readable.
         # Also swap ability_1 and ability_3 to maintain consistent ordering
         for player in right_players:
-            player["side"] = "right"
+            player["side"] = "right"  # type: ignore[assignment]
 
             # Flip player_name, health, and armor to make text readable
             if "player_name" in player and player["player_name"].size > 0:
@@ -214,7 +262,7 @@ class Cropper:
             player_box = player_region[current_y:current_y + individual_height, :].copy()
 
             # Crop sub-regions within player box
-            player_crops = {}
+            player_crops: Dict[str, np.ndarray] = {}
             for element_name, coords in individual_info.items():
                 ex, ey = coords["x"], coords["y"]
                 ewidth, eheight = coords["width"], coords["height"]
@@ -264,19 +312,23 @@ class Cropper:
         individual_info_preround = self.regions["individual_player_info_preround"]
 
         # LEFT side: players 0-4
-        left_players = self._crop_side_players(frame, player_info_preround, individual_info_preround)
+        left_players = self._crop_side_players(
+            frame, player_info_preround, individual_info_preround
+        )
         for player in left_players:
-            player["side"] = "left"
+            player["side"] = "left"  # type: ignore[assignment]
 
         # RIGHT side: players 5-9
         # Mirror frame horizontally to access right side using same coordinates
         mirrored_frame = cv2.flip(frame, 1)
-        right_players = self._crop_side_players(mirrored_frame, player_info_preround, individual_info_preround)
+        right_players = self._crop_side_players(
+            mirrored_frame, player_info_preround, individual_info_preround
+        )
 
         # Flip player_name back for right side players (text needs to be readable)
         # Also swap ability_1 and ability_3 to maintain consistent ordering
         for player in right_players:
-            player["side"] = "right"
+            player["side"] = "right"  # type: ignore[assignment]
 
             # Flip player_name to make text readable
             if "player_name" in player and player["player_name"].size > 0:
@@ -302,12 +354,18 @@ class Cropper:
             - killfeed: List of 10 kill entry crops
             - player_info: List of 10 player info dictionaries
         """
-        result = {}
+        result: Dict[str, Any] = {}
 
-        # Simple regions
-        simple_regions = ["round_number", "team1_score", "team2_score", "round_timer", "minimap"]
+        # Preserve legacy profile behavior while supporting optional validated minimap profiles.
+        simple_regions = ["round_number", "team1_score", "team2_score", "round_timer"]
         for region_name in simple_regions:
             result[region_name] = self.crop_simple_region(frame, region_name)
+        if self.config.get("minimap") is not None:
+            result["minimap"] = self.crop_minimap(frame)
+        elif "minimap" in self.regions:
+            result["minimap"] = self.crop_simple_region(frame, "minimap")
+        else:
+            result["minimap"] = np.empty((0, 0, 3), dtype=frame.dtype)
 
         # Killfeed
         result["killfeed"] = self.crop_killfeed(frame)
@@ -321,9 +379,13 @@ class Cropper:
         """Get information about the loaded configuration."""
         return {
             "name": self.config["name"],
-            "simple_regions": ["round_number", "team1_score", "team2_score", "round_timer", "minimap"],
+            "simple_regions": [
+                "round_number", "team1_score", "team2_score", "round_timer", "minimap"
+            ],
             "killfeed_entries": 10,
             "player_count": 10,
             "player_elements": list(self.regions["individual_player_info"].keys()),
-            "player_elements_preround": list(self.regions["individual_player_info_preround"].keys()),
+            "player_elements_preround": list(
+                self.regions["individual_player_info_preround"].keys()
+            ),
         }

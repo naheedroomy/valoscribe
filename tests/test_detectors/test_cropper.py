@@ -1,11 +1,11 @@
 """Unit tests for cropper module."""
 
 from __future__ import annotations
-from pathlib import Path
-from unittest.mock import patch, mock_open
-import pytest
+
 import json
+
 import numpy as np
+import pytest
 
 from valoscribe.detectors.cropper import Cropper
 

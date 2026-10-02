@@ -342,7 +342,8 @@ def crop(
                     for region_name in ["round_number", "team1_score", "team2_score", "round_timer", "minimap"]:
                         crop = cropped_regions[region_name]
                         filename = f"{region_name}.{crop_format}"
-                        cv2.imwrite(str(frame_dir / filename), crop)
+                        if crop.size > 0:
+                            cv2.imwrite(str(frame_dir / filename), crop)
 
                     # Save killfeed
                     for i, kill_crop in enumerate(cropped_regions["killfeed"]):

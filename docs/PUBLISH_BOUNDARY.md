@@ -1,9 +1,9 @@
-# Documentation-only checkout boundary
+# Documentation and code-checkpoint publication boundary
 
-**This documentation-only checkpoint is not a runnable source-code checkpoint.** It must not be presented as including the VTA implementation described by its evidence pages.
+This documentation records local VTA work and reviewed code checkpoints, but the presence of a document or its file paths does not establish that referenced code is included in a published checkout.
 
-The VTA-specific source changes, tests, scripts, configuration, assets, and optional dependency/extra changes referenced by these documents are currently local, uncommitted worktree content. They will be absent from any documentation-only published checkout until reviewed, dependency-complete code checkpoints are separately included. This does not refer to the inherited upstream Valoscribe baseline.
+VTA-specific source, tests, scripts, configuration, assets, and optional dependencies may be local and uncommitted, or may be included in a checkout only as part of an explicitly enumerated, reviewed, dependency-complete code checkpoint. Check each checkpoint's allowlist and version/publication state before claiming code availability. This does not refer to the inherited upstream Valoscribe baseline. The six-file VTA-101 limited checkpoint described in [`vta101-code-checkpoint.md`](vta101-code-checkpoint.md) is version-specific: verify its referenced paths and checkpoint version in the checkout being described. The earlier docs-only commit `56e45e7` does not contain that checkpoint. Do not assert a push or other publication until verified against an actual commit SHA.
 
-Commands, import snippets, file paths, and test recipes in this documentation are local-worktree or future-checkpoint recipes. They may fail or refer to files unavailable in a docs-only checkout; do not describe them as runnable there. Their presence records how to reproduce a result once its complete code/dependency checkpoint and any required local input are available. Check the relevant evidence row for source-media and fixture requirements.
+Commands, import snippets, file paths, and test recipes are scoped to the explicitly named local snapshot or checkpoint version. They may require code, dependencies, or local inputs not present in a docs-only checkout. Check the relevant evidence row and checkpoint for exact scope and source-media/fixture requirements. Do not imply that VTA implementation is universally absent from a future published checkout: only claim the code and dependencies actually included by its identified commit.
 
-This notice describes a publication boundary only. **It does not assert that this documentation has been pushed or published.**
+This notice describes publication boundaries only. It does not assert that any current uncommitted documentation or code has been pushed or published.
