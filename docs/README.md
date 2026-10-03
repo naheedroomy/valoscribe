@@ -2,6 +2,8 @@
 
 ## Active source of truth
 
+- [Milestone specification index](../specs/README.md) — current implemented reset evidence, proposed next milestone, and specification iteration policy.
+
 - [VALORANT MVP Reset v1.0 specification](../specs/active/MVP_RESET_AND_REPOSITORY_CLEANUP_SPEC.md) — the only active implementation specification. It supersedes the earlier broad `PROJECT_SPEC.md` for the current milestone.
 - [Project instructions](../AGENTS.md) — scope lock, evidence policy, and required phase order.
 - [Root README](../README.md) — repository setup and CLI overview; the real-round MVP remains in progress.
