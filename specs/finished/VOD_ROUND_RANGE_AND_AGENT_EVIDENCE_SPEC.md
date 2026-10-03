@@ -1,10 +1,10 @@
 # VOD round range and agent evidence — next milestone
 
-- Status: **Proposed**
-- Revision: **0.1**
+- Status: **Stage 1 Complete** (Foundation & Preflight delivered; Stages 2 & 3 pending)
+- Revision: **0.2**
 - Date: **2026-10-04**
-- Implementation approval: **not granted**; no schedule estimated.
-- Authority: planning only. The [reset specification](../active/MVP_RESET_AND_REPOSITORY_CLEANUP_SPEC.md) remains the only active implementation spec, including its §§19–20 gates.
+- Implementation status: Stage 1 merged to `main` (commit `5049b67`).
+- Authority: Foundation accepted on local VOD fixture.
 
 ## 1. Purpose and baseline
 
@@ -173,8 +173,23 @@ Forward roadmap only: arbitrary VOD/layout/map portability, identity tracking, u
 
 Keep versioned proposals and evidence-linked revisions under the [specs index](../README.md). Promotion requires explicit approval and reconciliation with the current active spec; this document does not change AGENTS, scope lock or activation state.
 
+### Stage 1 Execution Notes & Real VOD Observations
+- **Deliverables**:
+  - Typed contracts: `RawMarkerObservation`, `TeamFrameState`, `CorrectionDelta`, and `MarkerAdjudication` extended with `team_id: str = "single-team"`.
+  - Manifest contracts: `VODRoundManifest`, `RoundManifestEntry`, `ExcludedSpan`, `TeamManifestDefinition`, `TeamColorCalibration`, and `VODBroadcastProfile` in `src/valoscribe/tactical/manifest.py`.
+  - Preflight validation engine: `validate_vod_preflight` in `src/valoscribe/tactical/preflight.py` verifying SHA-256 integrity, map dimensions, independent team calibrations, and round completeness.
+  - Fixtures: `configs/examples/ascent-map3-rounds.example.json` and `ascent-vct-profile.example.json` bound to the local 1.8GB Grand Final VOD.
+  - CLI: `analyze-vod` in `src/valoscribe/tactical/cli.py` supporting `--preflight` dry-run inspection, summary tables, and JSON plan generation.
+- **Observations on Real Footage**:
+  - Fast chunked 64KB hashing computes the SHA-256 (`a2feb25b...`) of the 1.8GB VOD in < 2 seconds.
+  - Preflight cleanly resolves rounds 4–7 for `100T` vs `LOUD` with exact attack/defense sides.
+  - Fail-closed validation cleanly halts when unconfirmed rounds are requested (e.g. requesting round 8 reports exact boundary anchor and status).
+  - Directory collision protection successfully prevents overwriting existing runs (`FileExistsError`).
+  - Merged into `main` with 1,282 tests passing, 0 ruff errors, and 0 mypy issues across 136 files.
+
 ### Change log
 
-- 0.1 — 2026-10-04: Initial proposed supported-Ascent round-range, both-team movement and external-agent evidence milestone; no implementation authorized.
+- 0.2 — 2026-10-04: Completed Stage 1 (Foundation, Preflight, Contracts, CLI) and verified against real local VOD; moved to `specs/finished/`.
+- 0.1 — 2026-10-04: Initial proposed supported-Ascent round-range, both-team movement and external-agent evidence milestone.
 
 Documentation verification from project root: `git diff --check`; check relative Markdown links and keep this spec at or below 280 lines.
