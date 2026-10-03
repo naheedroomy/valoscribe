@@ -1027,7 +1027,7 @@ Integrate with the existing Typer CLI if practical. Exact names may follow curre
 ### 14.1 Inspect configuration and calibration
 
 ```bash
-uv run python -m valoscribe tactical inspect \
+uv run --extra parquet python -m valoscribe tactical inspect \
   --config .local/configs/ascent-mvp.yaml
 ```
 
@@ -1043,7 +1043,7 @@ Must:
 ### 14.2 Analyze configured rounds
 
 ```bash
-uv run python -m valoscribe tactical analyze \
+uv run --extra parquet python -m valoscribe tactical analyze \
   --config .local/configs/ascent-mvp.yaml
 ```
 
@@ -1060,7 +1060,7 @@ Must:
 ### 14.3 Review detections
 
 ```bash
-uv run python -m valoscribe tactical review \
+uv run --extra parquet python -m valoscribe tactical review \
   --run-dir .local/runs/<run-id> \
   --round-id <round-id>
 ```
@@ -1068,7 +1068,7 @@ uv run python -m valoscribe tactical review \
 ### 14.4 Rebuild derived outputs
 
 ```bash
-uv run python -m valoscribe tactical rebuild \
+uv run --extra parquet python -m valoscribe tactical rebuild \
   --run-dir .local/runs/<run-id>
 ```
 

@@ -4,16 +4,28 @@ This workflow samples only manually configured source intervals. It does not dis
 
 ## Configuration
 
-Use `configs/examples/ascent-team-movement.example.yaml` as JSON-compatible YAML. The file deliberately uses JSON syntax, which is valid YAML and needs no YAML dependency. Set the local source path and hash only in `.local/configs/`; keep broadcast crop/color settings in the run configuration and zone polygons/assignment limits in `configs/maps/ascent.yaml`.
+Use `configs/examples/ascent-team-movement.example.yaml` as JSON-compatible YAML. Copy it to `.local/configs/`, then set a fresh run ID, the source path and matching SHA-256. Keep local video/config/output data under ignored `.local/`. The checked-in example has source-specific candidate calibration values, not a universal profile: inspect the selected VOD and replace/confirm its broadcast crop, orientation, transform and color ranges from that source before analysis. Keep broadcast crop/color settings in the run configuration and zone polygons/assignment limits in `configs/maps/ascent.yaml`.
+
+Example fresh local setup (the example must still be edited for the local video and hash):
+
+```bash
+mkdir -p .local/configs
+cp configs/examples/ascent-team-movement.example.yaml .local/configs/ascent-local.yaml
+# Edit .local/configs/ascent-local.yaml, then:
+uv run --extra parquet python -m valoscribe tactical inspect --config .local/configs/ascent-local.yaml
+uv run --extra parquet python -m valoscribe tactical analyze --config .local/configs/ascent-local.yaml
+```
+
+Choose a never-before-used run ID. `analyze` will not overwrite an existing run. For corrections, use the review/adjudication commands on the local run and rebuild only derived reports with `uv run --extra parquet valoscribe tactical rebuild --run-dir .local/runs/<run-id>`.
 
 The five checked intervals are partial source windows with their live starts included. Round 9 has an explicit replay/transition gap from 971–975 seconds; its first usable opening sample is 975 seconds. The opening window counts usable samples, not excluded gaps.
 
 ## Inspect and analyze
 
 ```bash
-uv run python -m valoscribe tactical inspect \
+uv run --extra parquet python -m valoscribe tactical inspect \
   --config .local/configs/ascent-team-movement-mvp001.yaml
-uv run python -m valoscribe tactical analyze \
+uv run --extra parquet python -m valoscribe tactical analyze \
   --config .local/configs/ascent-team-movement-mvp001.yaml
 ```
 

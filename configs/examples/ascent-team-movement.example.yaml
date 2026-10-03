@@ -16,7 +16,7 @@
     "strong_coverage_marker_count": 5
   },
   "source": {
-    "video_path": "../VOD/YTDown.com_YouTube_Media_4LEGEQ8KBS0_100T-vs-LOUD-VCT-Americas-Stage-2-Playoffs-Grand-Final-Map-3-Ascent_001_1080p.mp4",
+    "video_path": ".local/media/ascent-vod.mp4",
     "expected_width": 1920,
     "expected_height": 1080,
     "sha256": "a2feb25b842b6c1c2baa17f8ef0c5ecfe1816bd058a1c256350fa95900454c44"
