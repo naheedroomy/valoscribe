@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "source_video_sha256": "a2feb25b842b6c1c2baa17f8ef0c5ecfe1816bd058a1c256350fa95900454c44",
+  "match_id": "vct-americas-2024-stage-2-playoffs-grand-final",
+  "map_id": "map3-ascent",
+  "map_name": "ascent",
+  "teams": {
+    "100T": {
+      "team_id": "100T",
+      "name": "100 Thieves",
+      "starting_side": "attack",
+      "broadcast_slot": "right",
+      "broadcast_color_label": "red"
+    },
+    "LOUD": {
+      "team_id": "LOUD",
+      "name": "LOUD",
+      "starting_side": "defense",
+      "broadcast_slot": "left",
+      "broadcast_color_label": "green"
+    }
+  },
+  "halftime_after_round": 12,
+  "rounds": [
+    {
+      "map_round": 4,
+      "round_id": "map3-round4",
+      "source_start_seconds": 263.0,
+      "source_end_seconds": 330.0,
+      "live_start_seconds": 263.0,
+      "status": "confirmed",
+      "team_sides": {
+        "100T": "attack",
+        "LOUD": "defense"
+      },
+      "boundary_evidence": "t=263 is first live timer 1:39 after freeze countdown at t=262.",
+      "excluded_spans": []
+    },
+    {
+      "map_round": 5,
+      "round_id": "map3-round5",
+      "source_start_seconds": 379.0,
+      "source_end_seconds": 420.0,
+      "live_start_seconds": 379.0,
+      "status": "confirmed",
+      "team_sides": {
+        "100T": "attack",
+        "LOUD": "defense"
+      },
+      "boundary_evidence": "t=379 is first live timer 1:40; t=378 is pre-round 0:00.",
+      "excluded_spans": []
+    },
+    {
+      "map_round": 6,
+      "round_id": "map3-round6",
+      "source_start_seconds": 540.0,
+      "source_end_seconds": 600.0,
+      "live_start_seconds": 540.0,
+      "status": "confirmed",
+      "team_sides": {
+        "100T": "attack",
+        "LOUD": "defense"
+      },
+      "boundary_evidence": "t=540 is first live timer 1:39; t=539 is pre-round 0:00.",
+      "excluded_spans": []
+    },
+    {
+      "map_round": 7,
+      "round_id": "map3-round7",
+      "source_start_seconds": 790.0,
+      "source_end_seconds": 870.0,
+      "live_start_seconds": 790.0,
+      "status": "confirmed",
+      "team_sides": {
+        "100T": "attack",
+        "LOUD": "defense"
+      },
+      "boundary_evidence": "t=790 is first live timer 1:39; t=789 is pre-round 0:00.",
+      "excluded_spans": []
+    },
+    {
+      "map_round": 9,
+      "round_id": "map3-round9",
+      "source_start_seconds": 971.0,
+      "source_end_seconds": 1020.0,
+      "live_start_seconds": 975.0,
+      "status": "confirmed",
+      "team_sides": {
+        "100T": "attack",
+        "LOUD": "defense"
+      },
+      "boundary_evidence": "t=975 first live timer 1:39; t=971–975 is replay/transition and excluded, not opening coverage.",
+      "excluded_spans": [
+        {
+          "start_seconds": 971.0,
+          "end_seconds": 975.0,
+          "reason": "Broadcast replay/transition before live Round 9; excluded from usable opening evidence."
+        }
+      ]
+    }
+  ],
+  "reviewer": "manual-observer-review",
+  "review_method": "manual",
+  "notes": "Verified intervals for Map 3 rounds 4, 5, 6, 7, and 9 from VCT Americas 2024 Stage 2 Grand Final Ascent VOD."
+}

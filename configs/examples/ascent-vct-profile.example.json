@@ -1,0 +1,64 @@
+{
+  "profile_id": "vct-americas-2024-stage2-grand-final-ascent",
+  "calibration_status": "candidate_source_tuned",
+  "minimap_crop": {
+    "x": 70,
+    "y": 50,
+    "width": 360,
+    "height": 400,
+    "orientation": "rotate_90_ccw"
+  },
+  "transform": {
+    "method": "affine",
+    "input_coordinates": "raw_crop_pixels_before_orientation_transform",
+    "output_coordinates": "canonical_image_pixels",
+    "matrix": [
+      [
+        -0.0326733681,
+        4.9397239044,
+        48.6174636631
+      ],
+      [
+        -4.9208259748,
+        -0.0087414481,
+        1902.8049429962
+      ]
+    ],
+    "training_points": 10,
+    "training_residual_mean_rms_max_px": [
+      1.1604,
+      1.3662,
+      2.4751
+    ],
+    "heldout_max_px": {
+      "2460": 9.1376,
+      "2820": 7.2684,
+      "2940": 7.2684
+    },
+    "calibration_status": "candidate_not_accepted"
+  },
+  "team_calibrations": {
+    "100T": {
+      "team_id": "100T",
+      "color_ranges_hsv": [
+        {
+          "lower": [0, 100, 100],
+          "upper": [15, 255, 255]
+        },
+        {
+          "lower": [165, 100, 100],
+          "upper": [179, 255, 255]
+        }
+      ]
+    },
+    "LOUD": {
+      "team_id": "LOUD",
+      "color_ranges_hsv": [
+        {
+          "lower": [35, 100, 100],
+          "upper": [85, 255, 255]
+        }
+      ]
+    }
+  }
+}

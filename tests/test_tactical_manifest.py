@@ -347,3 +347,27 @@ def test_load_manifest_and_load_profile_roundtrip(tmp_path: Path) -> None:
         load_manifest(bad_file)
     with pytest.raises(ValueError, match="profile must be valid JSON"):
         load_profile(bad_file)
+
+
+def test_example_manifest_and_profile_fixtures_load() -> None:
+    from pathlib import Path
+
+    from valoscribe.tactical.manifest import load_manifest, load_profile
+
+    root = Path(__file__).parents[1]
+    manifest_path = root / "configs/examples/ascent-map3-rounds.example.json"
+    profile_path = root / "configs/examples/ascent-vct-profile.example.json"
+
+    assert manifest_path.is_file()
+    assert profile_path.is_file()
+
+    manifest = load_manifest(manifest_path)
+    assert manifest.map_name == "ascent"
+    assert "100T" in manifest.teams
+    assert "LOUD" in manifest.teams
+    assert len(manifest.rounds) >= 5
+
+    profile = load_profile(profile_path)
+    assert "100T" in profile.team_calibrations
+    assert "LOUD" in profile.team_calibrations
+
