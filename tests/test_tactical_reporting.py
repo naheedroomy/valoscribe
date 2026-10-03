@@ -7,8 +7,11 @@ from collections import Counter
 from pathlib import Path
 
 import numpy as np
+from typer.testing import CliRunner
 
+import valoscribe.tactical.cli as cli_module
 from valoscribe.tactical.config import load_config
+from valoscribe.tactical.contracts import RoundMovementSummary
 from valoscribe.tactical.pipeline import analyze_config
 from valoscribe.tactical.reporting import build_round_summary, write_aggregate_report
 
@@ -75,6 +78,12 @@ def test_opening_and_sustained_shift_commitment_are_evidence_linked_candidates()
     assert len(summary.opening_evidence["samples"]) == 32
     assert summary.first_major_shift_direction == "A"
     assert summary.first_major_shift_evidence["after"]["sample_index"] == 44
+    baseline = summary.first_major_shift_evidence["baseline_window"]
+    assert (
+        baseline["end_timestamp_seconds"]
+        < summary.first_major_shift_evidence["persistence_window"]["start_timestamp_seconds"]
+    )
+    assert len(baseline["sample_indices"]) >= 8
     assert summary.commitment_evidence["sample"]["sample_index"] >= 44
     assert summary.opposite_side_presence == "unknown"
     assert summary.commitment_evidence["sample"]["coverage_status"] == "partial"
@@ -171,8 +180,144 @@ def test_unknown_gap_and_reversal_break_shift_and_commitment_persistence() -> No
         report_root=Path("."),
         map_data=map_data,
     )
-    assert reversed_summary.first_major_shift_direction == "B"
+    assert reversed_summary.first_major_shift_direction is None
     assert reversed_summary.apparent_commitment_site is None
+
+
+def test_commitment_reversal_after_full_persistence_window_is_rejected() -> None:
+    config, round_config, map_data = _setup()
+    rows = _samples(config, round_config)
+    for row in rows:
+        offset = row["source_timestamp_seconds"] - round_config.source_start_seconds
+        if offset >= 11.25:
+            row["zone_counts"] = {"a_main": 0, "a_site": 0, "b_main": 3, "b_site": 0}
+            row["macro_counts"].update({"A": 0, "B": 3, "MID": 1})
+    summary = build_round_summary(
+        round_config.round_id,
+        round_config,
+        config,
+        rows,
+        report_root=Path("."),
+        map_data=map_data,
+    )
+    assert summary.first_major_shift_direction == "A"
+    assert summary.apparent_commitment_site == "B"
+    assert (
+        summary.commitment_evidence["sample"]["timestamp_seconds"]
+        >= round_config.source_start_seconds + 11.25
+    )
+
+
+def test_zero_second_commitment_guard_is_explicitly_disabled() -> None:
+    config, round_config, map_data = _setup()
+    config = config.model_copy(
+        update={"run": config.run.model_copy(update={"commitment_reversal_guard_seconds": 0})}
+    )
+    summary = build_round_summary(
+        round_config.round_id,
+        round_config,
+        config,
+        _samples(config, round_config),
+        report_root=Path("."),
+        map_data=map_data,
+    )
+    assert summary.apparent_commitment_site == "A"
+    assert summary.commitment_evidence["reversal_check_window"] == {
+        "disabled": True,
+        "duration_seconds": 0.0,
+        "sample_indices": [],
+    }
+
+
+def test_shift_requires_stable_adjacent_baseline_and_candidate_onset_persistence() -> None:
+    config, round_config, map_data = _setup()
+    rows = _samples(config, round_config)
+    # A brief early increase fails persistence; the later stable level is only
+    # one above its immediate stable baseline and cannot borrow the early peak.
+    for row in rows:
+        offset = row["source_timestamp_seconds"] - round_config.source_start_seconds
+        if 6 <= offset < 6.5:
+            row["macro_counts"].update({"A": 3, "B": 0})
+        elif 6.5 <= offset < 12:
+            row["macro_counts"].update({"A": 1, "B": 2})
+        elif offset >= 12:
+            row["macro_counts"].update({"A": 2, "B": 1})
+    summary = build_round_summary(
+        round_config.round_id,
+        round_config,
+        config,
+        rows,
+        report_root=Path("."),
+        map_data=map_data,
+    )
+    assert summary.first_major_shift_evidence is None
+
+
+def test_first_shift_and_commitment_survive_unknown_gap_and_later_run() -> None:
+    config, round_config, map_data = _setup()
+    rows = _samples(config, round_config)
+    for row in rows:
+        offset = row["source_timestamp_seconds"] - round_config.source_start_seconds
+        if 12.25 <= offset < 13.25:
+            row["coverage_status"] = "unknown"
+        elif offset >= 13.25:
+            row["macro_counts"].update({"A": 1, "B": 2})
+            row["zone_counts"] = {"a_main": 0, "a_site": 0, "b_main": 0, "b_site": 0}
+    summary = build_round_summary(
+        round_config.round_id,
+        round_config,
+        config,
+        rows,
+        report_root=Path("."),
+        map_data=map_data,
+    )
+    assert summary.first_major_shift_direction == "A"
+    assert (
+        summary.commitment_evidence["sample"]["timestamp_seconds"]
+        < round_config.source_start_seconds + 12.25
+    )
+
+
+def test_overcount_cannot_establish_absence_and_emits_specific_warning() -> None:
+    config, round_config, map_data = _setup()
+    rows = _samples(config, round_config)
+    for row in rows:
+        row["coverage_status"] = "good"
+        row["observed_marker_count"] = 6
+        if row["source_timestamp_seconds"] >= round_config.source_start_seconds + 9:
+            row["macro_counts"].update({"A": 4, "MID": 2, "B": 0})
+            row["zone_counts"] = {"a_main": 4, "a_site": 0, "b_main": 0, "b_site": 0}
+    summary = build_round_summary(
+        round_config.round_id,
+        round_config,
+        config,
+        rows,
+        report_root=Path("."),
+        map_data=map_data,
+    )
+    assert summary.opposite_side_presence == "unknown"
+    assert any(
+        "exceeded the selected-team roster size of five" in item for item in summary.warnings
+    )
+
+
+def test_mid_shift_is_not_reported_as_a_site_regroup() -> None:
+    config, round_config, map_data = _setup()
+    rows = _samples(config, round_config)
+    for row in rows:
+        offset = row["source_timestamp_seconds"] - round_config.source_start_seconds
+        if offset >= 9:
+            row["macro_counts"].update({"A": 1, "MID": 3, "B": 0})
+    summary = build_round_summary(
+        round_config.round_id,
+        round_config,
+        config,
+        rows,
+        report_root=Path("."),
+        map_data=map_data,
+    )
+    assert summary.first_major_shift_direction == "MID"
+    assert summary.regroup_direction is None
 
 
 def test_aggregate_keeps_included_excluded_denominators_and_unknown_round_ids(
@@ -205,6 +350,14 @@ def test_aggregate_keeps_included_excluded_denominators_and_unknown_round_ids(
         round_config.round_id,
         "round-with-unknown-feature",
     ]
+    for feature in (
+        "opening",
+        "opening_completeness",
+        "regroup",
+        "commitment",
+        "opposite_side_presence",
+    ):
+        assert "round-with-unknown-feature" in aggregate.feature_unknown_by_feature[feature]
     assert (tmp_path / "aggregate/pattern_table.csv").is_file()
     assert (tmp_path / "aggregate/representative_rounds.json").is_file()
 
@@ -220,12 +373,14 @@ def test_analyze_emits_round_and_aggregate_report_artifacts(tmp_path: Path, monk
             "live_start_offset_seconds": 0.0,
         }
     )
+    second_round = round_config.model_copy(update={"round_id": "map3-round5"})
     config = config.model_copy(
         update={
             "run": config.run.model_copy(update={"run_id": "report-e2e", "output_root": tmp_path}),
-            "rounds": [round_config],
+            "rounds": [round_config, second_round],
         }
     )
+    raw_config = config.model_dump_json().encode("utf-8")
     map_path = ROOT / "configs/maps/ascent.yaml"
     asset = np.zeros((config.map.canonical_height, config.map.canonical_width, 3), dtype=np.uint8)
     map_data = {"zones": [], "commitment_zones": {"A": [], "B": []}}
@@ -274,8 +429,14 @@ def test_analyze_emits_round_and_aggregate_report_artifacts(tmp_path: Path, monk
     monkeypatch.setattr(pipeline, "_process_round", fake_process)
     run_dir, _result = analyze_config(tmp_path / "config.yaml", config, raw_config)
     round_dir = run_dir / "rounds" / round_config.round_id
+    second_round_dir = run_dir / "rounds" / second_round.round_id
+    for saved_round_dir in (round_dir, second_round_dir):
+        saved_summary = json.loads((saved_round_dir / "summary.json").read_text())
+        typed_summary = RoundMovementSummary.model_validate(saved_summary)
+        assert typed_summary.artifacts["occupancy_csv"] == "occupancy.csv"
     for path in (
         round_dir / "occupancy.csv",
+        second_round_dir / "summary.json",
         round_dir / "occupancy.parquet",
         round_dir / "summary.json",
         round_dir / "summary.md",
@@ -287,3 +448,30 @@ def test_analyze_emits_round_and_aggregate_report_artifacts(tmp_path: Path, monk
         run_dir / "aggregate/representative_rounds.json",
     ):
         assert path.is_file(), path
+
+    (second_round_dir / "corrections.jsonl").write_text("new-but-unrebuilt-correction\n")
+
+    def fake_rebuild(_run_dir, selected_round_id, _config):
+        revision_dir = run_dir / "rounds" / selected_round_id / "derived/revision-001"
+        revision_dir.mkdir(parents=True)
+        summary = json.loads((run_dir / "rounds" / selected_round_id / "summary.json").read_text())
+        (revision_dir / "summary.json").write_text(json.dumps(summary))
+        (revision_dir / "revision.json").write_text(json.dumps({"correction_count": 3}))
+        return {"revision_directory": str(revision_dir)}
+
+    monkeypatch.setattr(cli_module, "rebuild_round", fake_rebuild)
+    result = CliRunner().invoke(
+        cli_module.app,
+        ["rebuild", "--run-dir", str(run_dir), "--round-id", round_config.round_id],
+    )
+    assert result.exit_code == 0, result.output
+    aggregate_path = run_dir / "aggregate/derived-revision-001/summary.json"
+    aggregate = json.loads(aggregate_path.read_text())
+    assert aggregate["correction_counts_by_round"] == {
+        round_config.round_id: 3,
+        second_round.round_id: 0,
+    }
+    assert aggregate["consumed_round_revisions"] == {
+        round_config.round_id: f"rounds/{round_config.round_id}/derived/revision-001/summary.json",
+        second_round.round_id: f"rounds/{second_round.round_id}/summary.json",
+    }

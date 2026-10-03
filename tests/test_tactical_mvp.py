@@ -627,10 +627,11 @@ def test_rebuild_generates_corrected_occupancy_without_detection(
                 correction_id="late-append",
                 run_id="fixture",
                 round_id="map3-round4",
-                sample_index=1,
-                operation="add",
-                corrected_canonical_x=200,
-                corrected_canonical_y=300,
+                sample_index=0,
+                operation="remove",
+                target_observation_id="map3-round4:0:0",
+                original_canonical_x=1100.0,
+                original_canonical_y=800.0,
                 reviewer="concurrent-reviewer",
             )
             with (round_dir / "corrections.jsonl").open("a", encoding="utf-8") as stream:
@@ -638,10 +639,22 @@ def test_rebuild_generates_corrected_occupancy_without_detection(
             appended = True
 
     monkeypatch.setattr(correction_module, "_write_playbacks", append_after_snapshot)
+    original_put_text = cv2.putText
+    playback_captions: list[str] = []
+
+    def capture_caption(image, text, *args, **kwargs):
+        playback_captions.append(str(text))
+        return original_put_text(image, text, *args, **kwargs)
+
+    monkeypatch.setattr(cv2, "putText", capture_caption)
     first = rebuild_round(run_dir, "map3-round4", config)
     second = rebuild_round(run_dir, "map3-round4", config)
     assert first["detector_invoked"] is False
     assert first["correction_count"] == 0
+    assert (
+        first["corrections_sha256"]
+        == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    )
     assert second["correction_count"] == 1
     assert first["revision_directory"] != second["revision_directory"]
     revision = Path(first["revision_directory"])
@@ -670,7 +683,11 @@ def test_rebuild_generates_corrected_occupancy_without_detection(
         .read_text()
         .splitlines()
     ]
-    assert any(row["source"] == "corrected" for row in second_corrected)
+    assert not any(row["sample_index"] == 0 for row in second_corrected)
+    with (Path(second["revision_directory"]) / "occupancy.csv").open(encoding="utf-8") as stream:
+        second_occupancy = list(csv.DictReader(stream))
+    assert second_occupancy[0]["corrected"] == "True"
+    assert any("CORRECTED" in caption for caption in playback_captions)
 
 
 def test_corrected_playback_captions_use_derived_coverage_and_warnings(

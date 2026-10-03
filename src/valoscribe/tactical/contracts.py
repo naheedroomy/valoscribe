@@ -105,6 +105,7 @@ class RoundMovementSummary(Contract):
     warnings: list[str] = Field(default_factory=list)
     rule_configuration: dict = Field(default_factory=dict)
     evidence_paths: dict[str, str] = Field(default_factory=dict)
+    artifacts: dict[str, str] = Field(default_factory=dict)
 
 
 class AggregateMovementSummary(Contract):
@@ -121,6 +122,7 @@ class AggregateMovementSummary(Contract):
     feature_unknown_round_ids: list[str]
     feature_unknown_by_feature: dict[str, list[str]]
     correction_counts_by_round: dict[str, int]
+    consumed_round_revisions: dict[str, str] = Field(default_factory=dict)
     pattern_denominators: dict[str, int]
     limitations: list[str]
 

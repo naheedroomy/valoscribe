@@ -24,16 +24,18 @@ def observation_id(round_id: str, sample_index: int, ordinal: int) -> str:
     return f"{round_id}:{sample_index}:{ordinal}"
 
 
-def _read_jsonl(path: Path) -> list[dict[str, Any]]:
-    if not path.exists():
-        return []
+def _parse_jsonl(payload: bytes, source: Path) -> list[dict[str, Any]]:
     rows = []
-    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for number, line in enumerate(payload.decode("utf-8").splitlines(), 1):
         try:
             rows.append(json.loads(line))
         except json.JSONDecodeError as error:
-            raise ValueError(f"invalid JSONL at {path}:{number}") from error
+            raise ValueError(f"invalid JSONL at {source}:{number}") from error
     return rows
+
+
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    return _parse_jsonl(path.read_bytes(), path) if path.exists() else []
 
 
 def _append_records(path: Path, records: Sequence[BaseModel]) -> None:
@@ -121,9 +123,14 @@ def corrected_rows(
     config: TacticalConfig,
     correction_history: list[dict[str, Any]] | None = None,
     review_history: list[dict[str, Any]] | None = None,
+    raw_history: list[dict[str, Any]] | None = None,
 ) -> tuple[list[dict], set[int]]:
     run_id = config.run.run_id
-    raw = _read_jsonl(round_dir / "raw_observations.jsonl")
+    raw = (
+        raw_history
+        if raw_history is not None
+        else _read_jsonl(round_dir / "raw_observations.jsonl")
+    )
     coverage = _read_jsonl(round_dir / "sample_coverage.jsonl")
     timestamps = {
         int(row["sample_index"]): float(row["source_timestamp_seconds"]) for row in coverage
@@ -274,6 +281,7 @@ def _write_playbacks(
     canonical_by_sample: dict[int, list[dict]],
     coverage: list[dict],
     approved_samples: set[int],
+    corrected_samples: set[int] | None = None,
     summary=None,
 ) -> None:
     source = resolve_path(config.source.video_path)
@@ -343,7 +351,8 @@ def _write_playbacks(
             sample_observations = canonical_by_sample.get(int(frame["sample_index"]), [])
             source_state = (
                 "CORRECTED"
-                if any(item.get("source") == "corrected" for item in sample_observations)
+                if int(frame["sample_index"]) in (corrected_samples or set())
+                or any(item.get("source") == "corrected" for item in sample_observations)
                 else "REVIEWED"
                 if int(frame["sample_index"]) in approved_samples
                 else "RAW"
@@ -425,14 +434,22 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
     final_output = revision_root / f"revision-{revision:03d}"
     output = revision_root / f".revision-{revision:03d}-{uuid.uuid4().hex}.tmp"
     output.mkdir()
-    correction_history = _read_jsonl(round_dir / "corrections.jsonl")
-    review_history = _read_jsonl(round_dir / "reviewed_frames.jsonl")
+    raw_snapshot = raw_path.read_bytes()
+    corrections_path = round_dir / "corrections.jsonl"
+    corrections_snapshot = corrections_path.read_bytes() if corrections_path.exists() else b""
+    reviews_path = round_dir / "reviewed_frames.jsonl"
+    reviews_snapshot = reviews_path.read_bytes() if reviews_path.exists() else b""
+    raw_history = _parse_jsonl(raw_snapshot, raw_path)
+    correction_history = _parse_jsonl(corrections_snapshot, corrections_path)
+    review_history = _parse_jsonl(reviews_snapshot, reviews_path)
+    corrected_samples = {int(row["sample_index"]) for row in correction_history}
     rows, approved_samples = corrected_rows(
         round_dir,
         round_id,
         config,
         correction_history=correction_history,
         review_history=review_history,
+        raw_history=raw_history,
     )
     coverage = _read_jsonl(round_dir / "sample_coverage.jsonl")
     _, _, map_data, asset, _ = load_assets(config)
@@ -489,7 +506,7 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
                 "spread": spread,
                 "coverage_status": status,
                 "warnings": warnings,
-                "corrected": any(obs.get("source") == "corrected" for obs in observations),
+                "corrected": sample in corrected_samples,
             }
         )
     corrected_path = output / "corrected_observations.jsonl"
@@ -541,22 +558,15 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
         by_sample,
         coverage,
         approved_samples,
+        corrected_samples,
         summary,
     )
     manifest = {
         "revision": revision,
         "round_id": round_id,
-        "raw_observations_sha256": hashlib.sha256(raw_path.read_bytes()).hexdigest(),
-        "corrections_sha256": hashlib.sha256(
-            (round_dir / "corrections.jsonl").read_bytes()
-        ).hexdigest()
-        if (round_dir / "corrections.jsonl").exists()
-        else hashlib.sha256(b"").hexdigest(),
-        "reviewed_frames_sha256": hashlib.sha256(
-            (round_dir / "reviewed_frames.jsonl").read_bytes()
-        ).hexdigest()
-        if (round_dir / "reviewed_frames.jsonl").exists()
-        else hashlib.sha256(b"").hexdigest(),
+        "raw_observations_sha256": hashlib.sha256(raw_snapshot).hexdigest(),
+        "corrections_sha256": hashlib.sha256(corrections_snapshot).hexdigest(),
+        "reviewed_frames_sha256": hashlib.sha256(reviews_snapshot).hexdigest(),
         "correction_count": len(correction_history),
         "reviewed_frame_count": len({int(row["sample_index"]) for row in review_history}),
         "frame_count": len(occupancy),

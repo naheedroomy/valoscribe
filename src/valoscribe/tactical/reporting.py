@@ -82,6 +82,8 @@ def _runs(
 def _persisted(
     run: list[dict[str, Any]], predicate, duration: float
 ) -> list[dict[str, Any]] | None:
+    if not run or not predicate(run[0]):
+        return None
     streak: list[dict[str, Any]] = []
     for row in run:
         if predicate(row):
@@ -175,8 +177,16 @@ def build_round_summary(
             )
             if prior_span + period < config.run.stable_prior_window_seconds:
                 continue
+            prior_vectors = [_counts(row) for row in prior]
+            if any(
+                max(vector[macro] for vector in prior_vectors)
+                - min(vector[macro] for vector in prior_vectors)
+                > 1
+                for macro in MACROS
+            ):
+                continue
             old_counts = {
-                macro: round(sum(_counts(row)[macro] for row in prior) / len(prior))
+                macro: round(sum(vector[macro] for vector in prior_vectors) / len(prior_vectors))
                 for macro in MACROS
             }
             new_counts = _counts(candidate)
@@ -186,6 +196,8 @@ def build_round_summary(
                 if new_counts[macro] - old_counts[macro] >= config.run.major_shift_min_increase
             ]
             for macro in increased:
+                if shift is not None:
+                    break
                 stable = _persisted(
                     run[index:],
                     lambda row, m=macro, baseline=old_counts[macro]: _counts(row)[m] - baseline
@@ -193,21 +205,27 @@ def build_round_summary(
                     config.run.shift_persistence_seconds,
                 )
                 if stable:
+                    if shift is not None:
+                        break
                     shift = {
                         "direction": macro,
                         "before": _evidence(prior[-1]),
+                        "baseline_window": _coverage_evidence(prior),
                         "after": _evidence(stable[-1]),
                         "persistence_window": _coverage_evidence(stable),
                     }
-                    regroup = {
-                        "direction": macro,
-                        "evidence": _evidence(stable[-1]),
-                        "persistence_window": _coverage_evidence(stable),
-                    }
+                    if macro in {"A", "B"}:
+                        regroup = {
+                            "direction": macro,
+                            "evidence": _evidence(stable[-1]),
+                            "persistence_window": _coverage_evidence(stable),
+                        }
                     break
             if shift:
                 break
         for index, candidate in enumerate(run):
+            if commitment is not None:
+                break
             n = int(candidate["observed_marker_count"])
             if n <= 0:
                 continue
@@ -250,47 +268,52 @@ def build_round_summary(
                     float(stable[-1]["source_timestamp_seconds"])
                     + config.run.commitment_reversal_guard_seconds
                 )
-                confirmation = [
-                    row
-                    for row in run
-                    if float(row["source_timestamp_seconds"])
-                    > float(stable[-1]["source_timestamp_seconds"])
-                    and float(row["source_timestamp_seconds"]) <= confirm_end
-                ]
+                guard_seconds = config.run.commitment_reversal_guard_seconds
+                confirmation = (
+                    [
+                        row
+                        for row in run
+                        if float(row["source_timestamp_seconds"])
+                        >= float(stable[-1]["source_timestamp_seconds"])
+                        and float(row["source_timestamp_seconds"]) <= confirm_end
+                    ]
+                    if guard_seconds > 0
+                    else []
+                )
                 confirmed_through = (
-                    float(confirmation[-1]["source_timestamp_seconds"]) >= confirm_end - period
-                    if confirmation
-                    else config.run.commitment_reversal_guard_seconds == 0
+                    (
+                        bool(confirmation)
+                        and float(confirmation[0]["source_timestamp_seconds"])
+                        <= float(stable[-1]["source_timestamp_seconds"]) + 1e-6
+                        and float(confirmation[-1]["source_timestamp_seconds"])
+                        >= confirm_end - 1e-6
+                    )
+                    if guard_seconds > 0
+                    else True
                 )
                 if not confirmed_through:
                     continue
                 opposite = "B" if site == "A" else "A"
-                reversed_commitment = (
-                    _persisted(
-                        confirmation,
-                        lambda row, other=opposite: (
-                            sum(
-                                (row.get("zone_counts") or {}).get(zone, 0)
-                                for zone in target_zones[other]
-                            )
-                            >= 3
-                            and sum(
-                                (row.get("zone_counts") or {}).get(zone, 0)
-                                for zone in target_zones[other]
-                            )
-                            / max(1, int(row["observed_marker_count"]))
-                            >= 0.60
-                        ),
-                        config.run.commitment_reversal_guard_seconds,
+                selected_site_held = all(
+                    int(row["observed_marker_count"]) > 0
+                    and sum(
+                        (row.get("zone_counts") or {}).get(zone, 0) for zone in target_zones[site]
                     )
-                    if confirmation and config.run.commitment_reversal_guard_seconds
-                    else None
+                    >= 3
+                    and sum(
+                        (row.get("zone_counts") or {}).get(zone, 0) for zone in target_zones[site]
+                    )
+                    / int(row["observed_marker_count"])
+                    >= 0.60
+                    for row in confirmation
                 )
-                if reversed_commitment:
+                if not selected_site_held:
                     continue
                 strongly_covered = all(
                     row["coverage_status"] == "good"
-                    and int(row["observed_marker_count"]) >= config.run.strong_coverage_marker_count
+                    and config.run.strong_coverage_marker_count
+                    <= int(row["observed_marker_count"])
+                    <= 5
                     for row in [*stable, *confirmation]
                 )
                 presence = (
@@ -304,7 +327,11 @@ def build_round_summary(
                     "site": site,
                     "evidence": _evidence(stable[-1]),
                     "persistence_window": _coverage_evidence(stable),
-                    "reversal_check_window": _coverage_evidence(confirmation),
+                    "reversal_check_window": (
+                        _coverage_evidence(confirmation)
+                        if confirmation
+                        else {"disabled": True, "duration_seconds": 0.0, "sample_indices": []}
+                    ),
                     "opposite_side_presence": presence,
                     "opposite_side_evidence": [
                         _evidence(row) for row in stable if _counts(row)[opposite] > 0
@@ -383,12 +410,24 @@ def build_round_summary(
         unknown_intervals=unknown_intervals,
         coverage_numerator=len(opening_rows),
         coverage_denominator=len(all_opening_samples),
-        warnings=[
-            "Partial candidate observations do not establish complete-team occupancy.",
-            "Map calibration and detector remain pending human review.",
-        ]
-        if opening_confidence == "candidate_partial_coverage"
-        else [],
+        warnings=(
+            (
+                [
+                    "Partial candidate observations do not establish complete-team occupancy.",
+                    "Map calibration and detector remain pending human review.",
+                ]
+                if opening_confidence == "candidate_partial_coverage"
+                else []
+            )
+            + (
+                [
+                    "Observed marker count exceeded the selected-team roster size of five; "
+                    "over-count samples cannot establish strong absence evidence."
+                ]
+                if any(int(row["observed_marker_count"]) > 5 for row in occupancy)
+                else []
+            )
+        ),
         rule_configuration={
             "opening_window_seconds": config.run.opening_window_seconds,
             "stable_prior_window_seconds": config.run.stable_prior_window_seconds,
@@ -486,6 +525,7 @@ def write_aggregate_report(
     included_round_ids: list[str],
     excluded_round_ids: list[str],
     correction_counts: dict[str, int] | None = None,
+    consumed_round_revisions: dict[str, str] | None = None,
 ) -> AggregateMovementSummary:
     output_dir.mkdir(parents=True, exist_ok=True)
     eligible = [item for item in summaries if item.round_id in included_round_ids]
@@ -502,21 +542,25 @@ def write_aggregate_report(
         item.opposite_side_presence for item in eligible
     )
     summarized_ids = {item.round_id for item in eligible}
+    missing_ids = set(included_round_ids) - summarized_ids
     unknown_by_feature = {
         "opening": sorted(
-            set(included_round_ids) - summarized_ids
-            | {item.round_id for item in eligible if item.opening_distribution is None}
+            missing_ids | {item.round_id for item in eligible if item.opening_distribution is None}
         ),
         "opening_completeness": sorted(
-            set(included_round_ids) - summarized_ids
+            missing_ids
             | {item.round_id for item in eligible if item.opening_completeness == "unknown"}
         ),
-        "regroup": sorted(item.round_id for item in eligible if item.regroup_direction is None),
+        "regroup": sorted(
+            missing_ids | {item.round_id for item in eligible if item.regroup_direction is None}
+        ),
         "commitment": sorted(
-            item.round_id for item in eligible if item.apparent_commitment_site is None
+            missing_ids
+            | {item.round_id for item in eligible if item.apparent_commitment_site is None}
         ),
         "opposite_side_presence": sorted(
-            item.round_id for item in eligible if item.opposite_side_presence == "unknown"
+            missing_ids
+            | {item.round_id for item in eligible if item.opposite_side_presence == "unknown"}
         ),
     }
     unknown_ids = sorted({round_id for ids in unknown_by_feature.values() for round_id in ids})
@@ -560,6 +604,7 @@ def write_aggregate_report(
         feature_unknown_by_feature=unknown_by_feature,
         correction_counts_by_round=correction_counts
         or {round_id: 0 for round_id in included_round_ids},
+        consumed_round_revisions=consumed_round_revisions or {},
         pattern_denominators={
             "included_round_count": len(included_round_ids),
             "opening_known_round_count": sum(openings.values()),

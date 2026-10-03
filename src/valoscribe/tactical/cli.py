@@ -57,19 +57,31 @@ def rebuild_command(
         results = [rebuild_round(run_dir, item, config) for item in rounds]
         summaries = []
         correction_counts: dict[str, int] = {}
+        consumed_round_revisions: dict[str, str] = {}
         for round_config in config.rounds:
             round_root = run_dir / "rounds" / round_config.round_id
-            revisions = sorted((round_root / "derived").glob("revision-*"))
+            revisions = sorted(
+                (round_root / "derived").glob("revision-*"),
+                key=lambda item: int(item.name.rsplit("-", 1)[-1]),
+            )
+            selected_revision = revisions[-1] if revisions else None
             summary_path = (
-                revisions[-1] / "summary.json" if revisions else round_root / "summary.json"
+                selected_revision / "summary.json"
+                if selected_revision
+                else round_root / "summary.json"
             )
             if summary_path.is_file():
                 summaries.append(RoundMovementSummary.model_validate_json(summary_path.read_text()))
-            corrections_path = round_root / "corrections.jsonl"
-            correction_counts[round_config.round_id] = (
-                len(corrections_path.read_text(encoding="utf-8").splitlines())
-                if corrections_path.is_file()
-                else 0
+                consumed_round_revisions[round_config.round_id] = str(
+                    summary_path.relative_to(run_dir)
+                )
+            revision_manifest = (
+                json.loads((selected_revision / "revision.json").read_text(encoding="utf-8"))
+                if selected_revision
+                else {}
+            )
+            correction_counts[round_config.round_id] = int(
+                revision_manifest.get("correction_count", 0)
             )
         aggregate_root = run_dir / "aggregate"
         aggregate_root.mkdir(exist_ok=True)
@@ -85,6 +97,7 @@ def rebuild_command(
             [item.round_id for item in config.rounds],
             [item["round_id"] for item in config.excluded_rounds],
             correction_counts,
+            consumed_round_revisions,
         )
         final_aggregate = aggregate_root / f"derived-revision-{revision_number:03d}"
         temporary.rename(final_aggregate)

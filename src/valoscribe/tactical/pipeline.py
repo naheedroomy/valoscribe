@@ -775,13 +775,14 @@ def analyze_config(
             config.run.sample_fps,
             round_summary,
         )
-        summary_path = round_dir / "summary.json"
-        saved_summary = json.loads(summary_path.read_text(encoding="utf-8"))
-        saved_summary["artifacts"] = processing_summary.get("artifacts", {})
-        saved_summary["artifacts"].update(
-            {"occupancy_csv": "occupancy.csv", "occupancy_parquet": "occupancy.parquet"}
+        round_summary.artifacts = {
+            **processing_summary.get("artifacts", {}),
+            "occupancy_csv": "occupancy.csv",
+            "occupancy_parquet": "occupancy.parquet",
+        }
+        (round_dir / "summary.json").write_text(
+            round_summary.model_dump_json(indent=2) + "\n", encoding="utf-8"
         )
-        summary_path.write_text(json.dumps(saved_summary, indent=2) + "\n", encoding="utf-8")
     write_aggregate_report(
         run_dir / "aggregate",
         config.run.run_id,
