@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 from pathlib import Path
 
@@ -282,15 +283,230 @@ def test_review_and_rebuild_commands_are_exposed() -> None:
     assert runner.invoke(tactical_app, ["rebuild", "--help"]).exit_code == 0
 
 
-def test_review_controller_handles_navigation_selection_staging_and_save_state() -> None:
+def test_review_controller_blocks_navigation_until_staged_edits_are_saved_or_discarded() -> None:
     controller = ReviewController([4, 9])
     controller.select("observation")
     controller.stage({"operation": "add"})
     assert controller.dirty and controller.sample_index == 4
-    controller.move(1)
+    assert controller.move(1) is False
+    assert controller.sample_index == 4
+    controller.discard()
+    assert controller.move(1) is True
     assert controller.sample_index == 9 and controller.selected_id is None
     controller.saved()
     assert not controller.dirty and controller.staged == []
+
+
+@pytest.mark.parametrize(
+    ("scenario", "keys", "clicks", "has_raw"),
+    [
+        ("add-navigation-save", [ord("d"), ord("s"), ord("q")], [(20, 20), None, None], False),
+        ("approve-save", [ord("v"), ord("s"), ord("q")], [None, None, None], False),
+        (
+            "remove-navigation-save",
+            [127, ord("d"), ord("s"), ord("q")],
+            [(10, 10), None, None, None],
+            True,
+        ),
+        (
+            "add-save-remove-save",
+            [ord("s"), 127, ord("s"), ord("q")],
+            [(20, 20), (10, 10), None, None],
+            False,
+        ),
+        (
+            "add-cancel-save",
+            [ord("z"), 127, ord("s"), ord("q")],
+            [(20, 20), (10, 10), None, None],
+            False,
+        ),
+    ],
+)
+def test_review_round_preserves_frame_binding_and_staged_marker_ids(
+    tmp_path: Path, monkeypatch, scenario, keys, clicks, has_raw
+) -> None:
+    from valoscribe.tactical.review import review_round
+
+    config, _ = load_config(ROOT / "configs/examples/ascent-team-movement.example.yaml")
+    config = config.model_copy(
+        update={"run": config.run.model_copy(update={"run_id": "fixture"})}
+    )
+    round_id = "map3-round4"
+    round_dir = tmp_path / "run" / "rounds" / round_id
+    round_dir.mkdir(parents=True)
+    raw = (
+        {
+            "run_id": "fixture",
+            "round_id": round_id,
+            "sample_index": 0,
+            "canonical_x": 100.0,
+            "canonical_y": 100.0,
+            "confidence": 0.8,
+        },
+    ) if has_raw else ()
+    (round_dir / "raw_observations.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in raw)
+    )
+    (round_dir / "sample_coverage.jsonl").write_text(
+        "".join(
+            json.dumps(
+                {
+                    "sample_index": index,
+                    "source_timestamp_seconds": float(index),
+                    "coverage_status": "partial",
+                }
+            )
+            + "\n"
+            for index in (0, 1)
+        )
+    )
+
+    class Capture:
+        def isOpened(self):  # noqa: N802
+            return True
+
+        def set(self, *_args):
+            return True
+
+        def read(self):
+            return True, np.zeros((1080, 1920, 3), dtype=np.uint8)
+
+        def release(self):
+            pass
+
+    callback = None
+    call_index = 0
+
+    def set_mouse_callback(_window, handler):
+        nonlocal callback
+        callback = handler
+
+    def wait_key(_delay):
+        nonlocal call_index
+        x_y = clicks[call_index]
+        if x_y is not None:
+            callback(cv2.EVENT_LBUTTONDOWN, *x_y, 0, None)
+        result = keys[call_index]
+        call_index += 1
+        return result
+
+    monkeypatch.setattr(cv2, "VideoCapture", lambda _source: Capture())
+    monkeypatch.setattr(cv2, "namedWindow", lambda *_args: None)
+    monkeypatch.setattr(cv2, "setMouseCallback", set_mouse_callback)
+    monkeypatch.setattr(cv2, "imshow", lambda *_args: None)
+    monkeypatch.setattr(cv2, "waitKey", wait_key)
+    monkeypatch.setattr(cv2, "destroyWindow", lambda *_args: None)
+    monkeypatch.setattr(
+        "valoscribe.tactical.review._display_points",
+        lambda rows, _matrix: [(key, 10.0, 10.0, 1.0) for key, _row in rows],
+    )
+
+    review_round(tmp_path / "run", round_id, config)
+    persisted = [
+        json.loads(line)
+        for line in (round_dir / "corrections.jsonl").read_text().splitlines()
+    ] if (round_dir / "corrections.jsonl").exists() else []
+    assert all(item["sample_index"] == 0 for item in persisted)
+    if scenario == "approve-save":
+        reviewed = [
+            json.loads(line)
+            for line in (round_dir / "reviewed_frames.jsonl").read_text().splitlines()
+        ]
+        assert reviewed[0]["approved"] is True
+        assert persisted == []
+    elif scenario == "add-navigation-save":
+        assert [item["operation"] for item in persisted] == ["add"]
+    elif scenario == "remove-navigation-save":
+        assert [item["operation"] for item in persisted] == ["remove"]
+    elif scenario == "add-save-remove-save":
+        assert [item["operation"] for item in persisted] == ["add", "remove"]
+        assert persisted[1]["target_observation_id"] == persisted[0]["correction_id"]
+    else:
+        assert persisted == []
+
+
+def test_review_inspection_is_not_approval_and_approval_requires_eligible_coverage(
+    tmp_path: Path,
+) -> None:
+    config, _ = load_config(ROOT / "configs/examples/ascent-team-movement.example.yaml")
+    config = config.model_copy(update={"run": config.run.model_copy(update={"run_id": "fixture"})})
+    round_id = "map3-round4"
+    round_dir = tmp_path / "round"
+    round_dir.mkdir()
+    (round_dir / "raw_observations.jsonl").write_text("")
+    coverage_path = round_dir / "sample_coverage.jsonl"
+    coverage_path.write_text(
+        "".join(
+            json.dumps(
+                {"sample_index": index, "source_timestamp_seconds": 1.0, "coverage_status": status}
+            )
+            + "\n"
+            for index, status in ((0, "partial"), (1, "unknown"), (2, "excluded"), (3, "good"))
+        )
+    )
+    review_path = round_dir / "reviewed_frames.jsonl"
+    review_path.write_text(
+        "".join(
+            ReviewedFrame(
+                run_id="fixture",
+                round_id=round_id,
+                sample_index=index,
+                reviewer="reviewer",
+                approved=index != 0,
+            ).model_dump_json()
+            + "\n"
+            for index in (0, 3)
+        )
+    )
+    _, approved = corrected_rows(round_dir, round_id, config)
+    assert approved == {3}
+    with review_path.open("a", encoding="utf-8") as stream:
+        stream.write(
+            ReviewedFrame(
+                run_id="fixture", round_id=round_id, sample_index=3,
+                reviewer="reviewer", approved=False,
+            ).model_dump_json()
+            + "\n"
+        )
+    _, approved = corrected_rows(round_dir, round_id, config)
+    assert approved == set()
+    legacy_review = ReviewedFrame.model_validate(
+        {"run_id": "fixture", "round_id": round_id, "sample_index": 0, "reviewer": "old"}
+    )
+    assert legacy_review.approved is False
+    for index in (1, 2):
+        review_path.write_text(
+            ReviewedFrame(
+                run_id="fixture",
+                round_id=round_id,
+                sample_index=index,
+                reviewer="reviewer",
+                approved=True,
+            ).model_dump_json()
+            + "\n"
+        )
+        with pytest.raises(ValueError, match="only good or partial"):
+            corrected_rows(round_dir, round_id, config)
+
+    review_path.write_text(
+        ReviewedFrame(
+            run_id="fixture", round_id=round_id, sample_index=3,
+            reviewer="reviewer", approved=True,
+        ).model_dump_json()
+        + "\n"
+    )
+    raw = {
+        "run_id": "fixture",
+        "round_id": round_id,
+        "sample_index": 3,
+        "canonical_x": None,
+        "canonical_y": None,
+        "confidence": 0.5,
+        "source_timestamp_seconds": 1.0,
+    }
+    (round_dir / "raw_observations.jsonl").write_text(json.dumps(raw) + "\n")
+    with pytest.raises(ValueError, match="missing canonical coordinates"):
+        corrected_rows(round_dir, round_id, config)
 
 
 def test_rebuild_generates_corrected_occupancy_without_detection(
@@ -302,7 +518,8 @@ def test_rebuild_generates_corrected_occupancy_without_detection(
     source = tmp_path / "source.mp4"
     writer = cv2.VideoWriter(str(source), cv2.VideoWriter.fourcc(*"mp4v"), 30.0, (1920, 1080))
     assert writer.isOpened()
-    writer.write(np.zeros((1080, 1920, 3), dtype=np.uint8))
+    for _ in range(10):
+        writer.write(np.zeros((1080, 1920, 3), dtype=np.uint8))
     writer.release()
     config = config.model_copy(
         update={
@@ -326,8 +543,16 @@ def test_rebuild_generates_corrected_occupancy_without_detection(
         "crop_y": 1.0,
         "confidence": 0.7,
     }
+    null_row = {
+        **raw_row,
+        "sample_index": 1,
+        "canonical_x": None,
+        "canonical_y": None,
+        "quality_flags": ["transform_out_of_bounds"],
+    }
     raw_path = round_dir / "raw_observations.jsonl"
-    raw_path.write_text(json.dumps(raw_row) + "\n")
+    raw_payload = json.dumps(raw_row) + "\n" + json.dumps(null_row) + "\n"
+    raw_path.write_text(raw_payload)
     (round_dir / "sample_coverage.jsonl").write_text(
         json.dumps(
             {
@@ -339,6 +564,15 @@ def test_rebuild_generates_corrected_occupancy_without_detection(
             }
         )
         + "\n"
+        + json.dumps(
+            {
+                "sample_index": 1,
+                "source_timestamp_seconds": 0.0,
+                "coverage_status": "partial",
+                "observed_marker_count": 1,
+            }
+        )
+        + "\n"
     )
     (round_dir / "reviewed_frames.jsonl").write_text(
         ReviewedFrame(
@@ -347,9 +581,35 @@ def test_rebuild_generates_corrected_occupancy_without_detection(
         + "\n"
     )
     monkeypatch.setattr(detector, "detect_markers", lambda *args: pytest.fail("detector invoked"))
+    import valoscribe.tactical.corrections as correction_module
+
+    original_playbacks = correction_module._write_playbacks
+    appended = False
+
+    def append_after_snapshot(*args, **kwargs):
+        nonlocal appended
+        original_playbacks(*args, **kwargs)
+        if not appended:
+            late_delta = CorrectionDelta(
+                correction_id="late-append",
+                run_id="fixture",
+                round_id="map3-round4",
+                sample_index=1,
+                operation="add",
+                corrected_canonical_x=200,
+                corrected_canonical_y=300,
+                reviewer="concurrent-reviewer",
+            )
+            with (round_dir / "corrections.jsonl").open("a", encoding="utf-8") as stream:
+                stream.write(late_delta.model_dump_json() + "\n")
+            appended = True
+
+    monkeypatch.setattr(correction_module, "_write_playbacks", append_after_snapshot)
     first = rebuild_round(run_dir, "map3-round4", config)
     second = rebuild_round(run_dir, "map3-round4", config)
     assert first["detector_invoked"] is False
+    assert first["correction_count"] == 0
+    assert second["correction_count"] == 1
     assert first["revision_directory"] != second["revision_directory"]
     revision = Path(first["revision_directory"])
     assert (revision / "corrected_observations.jsonl").is_file()
@@ -357,8 +617,27 @@ def test_rebuild_generates_corrected_occupancy_without_detection(
     assert (revision / "occupancy.parquet").stat().st_size > 0
     assert (revision / "corrected_minimap.mp4").stat().st_size > 0
     assert (revision / "corrected_canonical.mp4").stat().st_size > 0
-    assert json.loads((revision / "revision.json").read_text())["reviewed_frame_count"] == 1
-    assert raw_path.read_text() == json.dumps(raw_row) + "\n"
+    manifest = json.loads((revision / "revision.json").read_text())
+    assert manifest["reviewed_frame_count"] == 1
+    with (revision / "occupancy.csv").open(encoding="utf-8") as stream:
+        occupancy = list(csv.DictReader(stream))
+    assert occupancy[0]["coverage_status"] == "partial"
+    assert json.loads(occupancy[0]["warnings"]) == ["unreviewed"]
+    assert occupancy[1]["coverage_status"] == "unknown"
+    assert "lack canonical coordinates" in occupancy[1]["warnings"]
+    assert raw_path.read_text() == raw_payload
+    corrected = [
+        json.loads(line)
+        for line in (revision / "corrected_observations.jsonl").read_text().splitlines()
+    ]
+    assert corrected[1]["canonical_x"] is None
+    second_corrected = [
+        json.loads(line)
+        for line in (Path(second["revision_directory"]) / "corrected_observations.jsonl")
+        .read_text()
+        .splitlines()
+    ]
+    assert any(row["source"] == "corrected" for row in second_corrected)
 
 
 def load_config_data(payload: dict) -> None:

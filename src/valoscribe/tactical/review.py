@@ -35,8 +35,16 @@ class ReviewController:
     def sample_index(self) -> int:
         return self.sample_indices[self.position]
 
-    def move(self, step: int) -> None:
+    def move(self, step: int) -> bool:
+        if self.dirty:
+            return False
         self.position = min(max(0, self.position + step), len(self.sample_indices) - 1)
+        self.selected_id = None
+        return True
+
+    def discard(self) -> None:
+        self.staged.clear()
+        self.dirty = False
         self.selected_id = None
 
     def select(self, observation_key: str | None) -> None:
@@ -104,17 +112,17 @@ def review_round(
     selected: str | None = None
     window = f"Tactical review: {round_id}"
 
+    approved = False
+
     def save() -> None:
-        sample = controller.sample_index
         deltas: list[CorrectionDelta] = []
         validation_history = list(existing_deltas)
         for item in controller.staged:
             values = dict(item)
             values.update(
-                correction_id=uuid.uuid4().hex,
+                correction_id=values.get("correction_id", uuid.uuid4().hex),
                 run_id=config.run.run_id,
                 round_id=round_id,
-                sample_index=sample,
                 reviewer=reviewer,
             )
             delta = CorrectionDelta.model_validate(values)
@@ -122,6 +130,7 @@ def review_round(
             deltas.append(delta)
             validation_history.append(delta.model_dump(mode="json"))
         _append_records(round_dir / "corrections.jsonl", deltas)
+        existing_deltas.extend(delta.model_dump(mode="json") for delta in deltas)
         _append_records(
             round_dir / "reviewed_frames.jsonl",
             [
@@ -130,6 +139,7 @@ def review_round(
                     round_id=round_id,
                     sample_index=sample,
                     reviewer=reviewer,
+                    approved=approved,
                     note="Frame reviewed in local reviewer",
                 )
             ],
@@ -137,7 +147,7 @@ def review_round(
         controller.saved()
 
     def mouse(event: int, x: int, y: int, flags: int, param: object) -> None:
-        nonlocal selected
+        nonlocal approved, selected
         if event != cv2.EVENT_LBUTTONDOWN:
             return
         sample = controller.sample_index
@@ -156,8 +166,11 @@ def review_round(
             return
         if 0 <= x < crop_cfg.width and 0 <= y < crop_cfg.height:
             canonical_x, canonical_y = _point_to_canonical(config, float(x), float(y))
+            approved = False
             controller.stage(
                 {
+                    "correction_id": uuid.uuid4().hex,
+                    "sample_index": sample,
                     "operation": "add",
                     "corrected_canonical_x": canonical_x,
                     "corrected_canonical_y": canonical_y,
@@ -168,7 +181,7 @@ def review_round(
                 by_sample.get(sample, []),
                 [
                     CorrectionDelta(
-                        correction_id=f"staged-{len(controller.staged)}",
+                        correction_id=controller.staged[-1]["correction_id"],
                         run_id=config.run.run_id,
                         round_id=round_id,
                         sample_index=sample,
@@ -205,7 +218,11 @@ def review_round(
                     (255, 255, 255),
                     1,
                 )
-            marker = " * UNSAVED" if controller.dirty else ""
+            marker = (
+                " * UNSAVED (S save / X discard; navigation locked)" if controller.dirty else ""
+            )
+            if approved:
+                marker += " APPROVAL PENDING SAVE"
             cv2.putText(
                 crop,
                 (
@@ -221,7 +238,7 @@ def review_round(
             )
             cv2.putText(
                 crop,
-                "Left/Right or A/D: frame | click add/select | Del remove | S save | Q quit",
+                "A/D frame, click add/select, Del remove; S save, X discard, V approve, Q quit",
                 (4, crop.shape[0] - 8),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.34,
@@ -233,21 +250,55 @@ def review_round(
             if keypress in (ord("q"), 27):
                 break
             if keypress in (ord("d"), 83):
-                controller.move(1)
-                selected = None
+                if controller.move(1):
+                    selected = None
+                    approved = False
             elif keypress in (ord("a"), 81):
-                controller.move(-1)
-                selected = None
+                if controller.move(-1):
+                    selected = None
+                    approved = False
             elif keypress in (ord("s"),):
                 save()
+            elif keypress == ord("x"):
+                controller.discard()
+                approved = False
+                selected = None
+            elif keypress == ord("v"):
+                frame_status = frames[controller.sample_index]["coverage_status"]
+                points = by_sample.get(controller.sample_index, [])
+                eligible = frame_status in {"good", "partial"} and all(
+                    row.get("canonical_x") is not None and row.get("canonical_y") is not None
+                    for _key, row in points
+                )
+                approved = eligible
             elif keypress in (8, 127, 46) and selected:
+                staged_add = next(
+                    (
+                        item
+                        for item in controller.staged
+                        if item.get("correction_id") == selected
+                        and item.get("operation") == "add"
+                    ),
+                    None,
+                )
+                if staged_add is not None:
+                    controller.staged.remove(staged_add)
+                    approved = False
+                    controller.dirty = bool(controller.staged)
+                    by_sample[sample] = [
+                        entry for entry in by_sample.get(sample, []) if entry[0] != selected
+                    ]
+                    selected = None
+                    continue
                 target = next(
                     (row for key, row in by_sample.get(sample, []) if key == selected), None
                 )
                 if target is None or target.get("canonical_x") is None:
                     continue
+                approved = False
                 controller.stage(
                     {
+                        "sample_index": sample,
                         "operation": "remove",
                         "target_observation_id": selected,
                         "original_canonical_x": target["canonical_x"],

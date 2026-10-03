@@ -115,7 +115,11 @@ def validate_delta(
 
 
 def corrected_rows(
-    round_dir: Path, round_id: str, config: TacticalConfig
+    round_dir: Path,
+    round_id: str,
+    config: TacticalConfig,
+    correction_history: list[dict[str, Any]] | None = None,
+    review_history: list[dict[str, Any]] | None = None,
 ) -> tuple[list[dict], set[int]]:
     run_id = config.run.run_id
     raw = _read_jsonl(round_dir / "raw_observations.jsonl")
@@ -123,9 +127,12 @@ def corrected_rows(
     timestamps = {
         int(row["sample_index"]): float(row["source_timestamp_seconds"]) for row in coverage
     }
-    corrections = [
-        CorrectionDelta.model_validate(row) for row in _read_jsonl(round_dir / "corrections.jsonl")
-    ]
+    correction_records = (
+        correction_history
+        if correction_history is not None
+        else _read_jsonl(round_dir / "corrections.jsonl")
+    )
+    corrections = [CorrectionDelta.model_validate(row) for row in correction_records]
     if not coverage:
         raise ValueError(f"sample frame evidence is missing for {round_id}")
     sample_indices = set(timestamps)
@@ -137,10 +144,12 @@ def corrected_rows(
     for delta in corrections:
         validate_delta(delta, raw, config, history)
         history.append(delta.model_dump(mode="json"))
-    reviewed = [
-        ReviewedFrame.model_validate(row)
-        for row in _read_jsonl(round_dir / "reviewed_frames.jsonl")
-    ]
+    review_records = (
+        review_history
+        if review_history is not None
+        else _read_jsonl(round_dir / "reviewed_frames.jsonl")
+    )
+    reviewed = [ReviewedFrame.model_validate(row) for row in review_records]
     if any(item.run_id != run_id or item.round_id != round_id for item in reviewed):
         raise ValueError("review record run_id/round_id does not match its run directory")
     if any(item.sample_index not in sample_indices for item in reviewed):
@@ -194,12 +203,33 @@ def corrected_rows(
             )
     if any(row["source_timestamp_seconds"] is None for row in rows):
         raise ValueError("correction refers to a sample with no sampled frame evidence")
-    reviewed_samples = {
-        item.sample_index
+    coverage_by_sample = {int(frame["sample_index"]): frame for frame in coverage}
+    latest_review_by_sample = {
+        item.sample_index: item
         for item in reviewed
         if item.run_id == run_id and item.round_id == round_id
     }
-    return rows, reviewed_samples
+    approved_samples: set[int] = set()
+    for reviewed_item in latest_review_by_sample.values():
+        if (
+            not reviewed_item.approved
+            or reviewed_item.run_id != run_id
+            or reviewed_item.round_id != round_id
+        ):
+            continue
+        frame = coverage_by_sample[reviewed_item.sample_index]
+        if frame["coverage_status"] not in {"good", "partial"}:
+            raise ValueError("only good or partial frames can be explicitly approved")
+        if any(
+            row.get("canonical_x") is None or row.get("canonical_y") is None
+            for row in rows
+            if int(row["sample_index"]) == reviewed_item.sample_index
+        ):
+            raise ValueError(
+                "cannot approve a frame with observations missing canonical coordinates"
+            )
+        approved_samples.add(reviewed_item.sample_index)
+    return rows, approved_samples
 
 
 def _write_playbacks(
@@ -211,7 +241,7 @@ def _write_playbacks(
     map_data: dict,
     canonical_by_sample: dict[int, list[dict]],
     coverage: list[dict],
-    reviewed_samples: set[int],
+    approved_samples: set[int],
 ) -> None:
     source = resolve_path(config.source.video_path)
     crop = config.broadcast.minimap_crop
@@ -253,10 +283,12 @@ def _write_playbacks(
                 "excluded"
                 if frame["coverage_status"] == "excluded"
                 else "good"
-                if frame["sample_index"] in reviewed_samples
+                if frame["sample_index"] in approved_samples
                 else frame["coverage_status"]
             )
             for obs in canonical_by_sample.get(frame["sample_index"], []):
+                if obs.get("canonical_x") is None or obs.get("canonical_y") is None:
+                    continue
                 x, y = float(obs["canonical_x"]), float(obs["canonical_y"])
                 p = (round(x), round(y))
                 confidence = float(obs.get("confidence", 1.0))
@@ -313,7 +345,15 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
     final_output = revision_root / f"revision-{revision:03d}"
     output = revision_root / f".revision-{revision:03d}-{uuid.uuid4().hex}.tmp"
     output.mkdir()
-    rows, reviewed = corrected_rows(round_dir, round_id, config)
+    correction_history = _read_jsonl(round_dir / "corrections.jsonl")
+    review_history = _read_jsonl(round_dir / "reviewed_frames.jsonl")
+    rows, approved_samples = corrected_rows(
+        round_dir,
+        round_id,
+        config,
+        correction_history=correction_history,
+        review_history=review_history,
+    )
     coverage = _read_jsonl(round_dir / "sample_coverage.jsonl")
     _, _, map_data, asset, _ = load_assets(config)
     by_sample: dict[int, list[dict]] = {}
@@ -331,9 +371,11 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
         zone_counts: Counter[str] = Counter()
         macro_counts: Counter[str] = Counter()
         points: list[tuple[float, float]] = []
+        unavailable_coordinates = 0
         for obs in observations:
             x, y = obs.get("canonical_x"), obs.get("canonical_y")
             if x is None or y is None:
+                unavailable_coordinates += 1
                 continue
             zone, macro = assign_zone(float(x), float(y), map_data)
             zone_counts[zone] += 1
@@ -353,9 +395,24 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
             "excluded"
             if frame["coverage_status"] == "excluded"
             else "good"
-            if sample in reviewed
+            if sample in approved_samples
+            else "unknown"
+            if unavailable_coordinates and not points
+            else "partial"
+            if unavailable_coordinates
             else frame["coverage_status"]
         )
+        warnings = [frame["warning"]] if frame.get("warning") else []
+        if unavailable_coordinates:
+            warnings.append(
+                f"{unavailable_coordinates} observation(s) lack canonical coordinates"
+            )
+        if (
+            sample not in approved_samples
+            and frame["coverage_status"] != "excluded"
+            and not warnings
+        ):
+            warnings.append("frame not explicitly approved")
         occupancy.append(
             {
                 "run_id": config.run.run_id,
@@ -371,11 +428,7 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
                 "centroid_y": centroid[1] if centroid else None,
                 "spread": spread,
                 "coverage_status": status,
-                "warnings": [frame.get("warning")]
-                if frame["coverage_status"] == "excluded" and frame.get("warning")
-                else []
-                if sample in reviewed
-                else [frame.get("warning") or "frame not manually reviewed"],
+                "warnings": warnings,
             }
         )
     corrected_path = output / "corrected_observations.jsonl"
@@ -404,14 +457,16 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
         ) from error
     pq.write_table(pa.Table.from_pylist(occupancy), output / "occupancy.parquet")
     _write_playbacks(
-        run_dir, round_id, output, config, asset, map_data, by_sample, coverage, reviewed
+        run_dir, round_id, output, config, asset, map_data, by_sample, coverage, approved_samples
     )
     manifest = {
         "revision": revision,
         "round_id": round_id,
         "raw_observations_sha256": hashlib.sha256(raw_path.read_bytes()).hexdigest(),
-        "correction_count": len(_read_jsonl(round_dir / "corrections.jsonl")),
-        "reviewed_frame_count": len(reviewed),
+        "correction_count": len(correction_history),
+        "reviewed_frame_count": len(
+            {int(row["sample_index"]) for row in review_history}
+        ),
         "frame_count": len(occupancy),
         "detector_invoked": False,
         "artifacts": [

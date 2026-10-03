@@ -61,7 +61,7 @@ class CorrectionDelta(Contract):
 
 
 class ReviewedFrame(Contract):
-    """Explicit evidence that a sampled frame was inspected, even with no edits."""
+    """Inspection record; approval is explicit and defaults false for old records."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -69,6 +69,7 @@ class ReviewedFrame(Contract):
     round_id: str
     sample_index: int = Field(ge=0)
     reviewer: str = Field(min_length=1)
+    approved: bool = False
     note: str | None = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
