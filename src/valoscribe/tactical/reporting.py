@@ -220,6 +220,8 @@ def build_round_summary(
                     regroup = {
                         "direction": macro,
                         "evidence": _evidence(stable[-1]),
+                        "before": _evidence(prior[-1]),
+                        "baseline_window": _coverage_evidence(prior),
                         "persistence_window": _coverage_evidence(stable),
                     }
             if shift is not None and regroup is not None:
@@ -389,7 +391,16 @@ def build_round_summary(
         first_major_shift_direction=shift["direction"] if shift else None,
         first_major_shift_evidence=shift,
         regroup_direction=regroup["direction"] if regroup else None,
-        regroup_evidence=regroup["evidence"] if regroup else None,
+        regroup_evidence=(
+            {
+                **regroup["evidence"],
+                "before": regroup["before"],
+                "baseline_window": regroup["baseline_window"],
+                "persistence_window": regroup["persistence_window"],
+            }
+            if regroup
+            else None
+        ),
         apparent_commitment_site=commitment["site"] if commitment else None,
         apparent_commitment_time=(
             commitment["evidence"]["timestamp_seconds"] if commitment else None

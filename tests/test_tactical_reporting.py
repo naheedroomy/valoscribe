@@ -14,7 +14,11 @@ import valoscribe.tactical.cli as cli_module
 from valoscribe.tactical.config import load_config
 from valoscribe.tactical.contracts import RoundMovementSummary
 from valoscribe.tactical.pipeline import analyze_config
-from valoscribe.tactical.reporting import build_round_summary, write_aggregate_report
+from valoscribe.tactical.reporting import (
+    build_round_summary,
+    write_aggregate_report,
+    write_round_report,
+)
 
 ROOT = Path(__file__).parents[1]
 
@@ -369,7 +373,10 @@ def test_mid_shift_is_not_reported_as_a_site_regroup() -> None:
     assert summary.regroup_direction is None
 
 
-def test_mid_first_shift_does_not_suppress_later_a_regroup() -> None:
+@pytest.mark.parametrize("regroup_direction", ["A", "B"])
+def test_mid_first_shift_regroup_evidence_survives_round_and_aggregate_json(
+    tmp_path: Path, regroup_direction: str
+) -> None:
     config, round_config, map_data = _setup()
     rows = _samples(config, round_config)
     for row in rows:
@@ -377,17 +384,82 @@ def test_mid_first_shift_does_not_suppress_later_a_regroup() -> None:
         if 9 <= offset < 13:
             row["macro_counts"].update({"A": 1, "MID": 3, "B": 0})
         elif offset >= 13:
-            row["macro_counts"].update({"A": 3, "MID": 1, "B": 0})
-    summary = build_round_summary(
+            row["macro_counts"].update(
+                {
+                    "A": 3 if regroup_direction == "A" else 1,
+                    "MID": 1,
+                    "B": 0 if regroup_direction == "A" else 2,
+                }
+            )
+    summary = write_round_report(
+        tmp_path,
         round_config.round_id,
         round_config,
         config,
         rows,
-        report_root=Path("."),
-        map_data=map_data,
+        map_data,
     )
     assert summary.first_major_shift_direction == "MID"
-    assert summary.regroup_direction == "A"
+    assert summary.first_major_shift_time == round_config.source_start_seconds + 11
+    assert summary.first_major_shift_evidence["after"]["sample_index"] == 44
+    assert summary.first_major_shift_evidence["persistence_window"]["sample_indices"] == list(
+        range(36, 45)
+    )
+    assert summary.regroup_direction == regroup_direction
+
+    saved_round = RoundMovementSummary.model_validate_json(
+        (tmp_path / "summary.json").read_text(encoding="utf-8")
+    )
+    regroup_evidence = saved_round.regroup_evidence
+    assert set(regroup_evidence) == {
+        "timestamp_seconds",
+        "sample_index",
+        "observed_marker_count",
+        "macro_counts",
+        "coverage_status",
+        "source",
+        "before",
+        "baseline_window",
+        "persistence_window",
+    }
+    assert regroup_evidence["sample_index"] == 60
+    assert regroup_evidence["timestamp_seconds"] == round_config.source_start_seconds + 15
+    assert regroup_evidence["before"]["sample_index"] == 51
+    assert (
+        regroup_evidence["before"]["timestamp_seconds"] == round_config.source_start_seconds + 12.75
+    )
+    assert regroup_evidence["baseline_window"]["sample_indices"] == list(range(44, 52))
+    assert (
+        regroup_evidence["baseline_window"]["start_timestamp_seconds"]
+        == round_config.source_start_seconds + 11
+    )
+    assert (
+        regroup_evidence["baseline_window"]["end_timestamp_seconds"]
+        == round_config.source_start_seconds + 12.75
+    )
+    assert regroup_evidence["persistence_window"]["sample_indices"] == list(range(52, 61))
+    assert (
+        regroup_evidence["persistence_window"]["start_timestamp_seconds"]
+        == round_config.source_start_seconds + 13
+    )
+    assert (
+        regroup_evidence["persistence_window"]["end_timestamp_seconds"]
+        == round_config.source_start_seconds + 15
+    )
+
+    aggregate_dir = tmp_path / "aggregate"
+    write_aggregate_report(
+        aggregate_dir,
+        config.run.run_id,
+        [saved_round],
+        [round_config.round_id],
+        [],
+    )
+    representatives = json.loads(
+        (aggregate_dir / "representative_rounds.json").read_text(encoding="utf-8")
+    )
+    assert representatives[0]["shift"] == saved_round.first_major_shift_evidence
+    assert representatives[0]["regroup"] == regroup_evidence
 
 
 def test_aggregate_keeps_included_excluded_denominators_and_unknown_round_ids(
