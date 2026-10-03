@@ -64,6 +64,7 @@ Thumbs.db
 tmp/
 /tmp/
 /progress.md
+.superpowers/
 
 # Local environment secrets; keep the documented template versioned
 .env
