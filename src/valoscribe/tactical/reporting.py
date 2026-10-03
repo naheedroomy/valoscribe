@@ -94,7 +94,7 @@ def _persisted(
             if elapsed + 1e-6 >= duration:
                 return streak
         else:
-            streak = []
+            return None
     return None
 
 
@@ -196,17 +196,19 @@ def build_round_summary(
                 if new_counts[macro] - old_counts[macro] >= config.run.major_shift_min_increase
             ]
             for macro in increased:
-                if shift is not None:
-                    break
+                should_record_shift = shift is None
+                should_record_regroup = regroup is None and macro in {"A", "B"}
+                if not should_record_shift and not should_record_regroup:
+                    continue
                 stable = _persisted(
                     run[index:],
                     lambda row, m=macro, baseline=old_counts[macro]: _counts(row)[m] - baseline
                     >= config.run.major_shift_min_increase,
                     config.run.shift_persistence_seconds,
                 )
-                if stable:
-                    if shift is not None:
-                        break
+                if not stable:
+                    continue
+                if shift is None:
                     shift = {
                         "direction": macro,
                         "before": _evidence(prior[-1]),
@@ -214,14 +216,13 @@ def build_round_summary(
                         "after": _evidence(stable[-1]),
                         "persistence_window": _coverage_evidence(stable),
                     }
-                    if macro in {"A", "B"}:
-                        regroup = {
-                            "direction": macro,
-                            "evidence": _evidence(stable[-1]),
-                            "persistence_window": _coverage_evidence(stable),
-                        }
-                    break
-            if shift:
+                if should_record_regroup and regroup is None:
+                    regroup = {
+                        "direction": macro,
+                        "evidence": _evidence(stable[-1]),
+                        "persistence_window": _coverage_evidence(stable),
+                    }
+            if shift is not None and regroup is not None:
                 break
         for index, candidate in enumerate(run):
             if commitment is not None:
@@ -269,17 +270,16 @@ def build_round_summary(
                     + config.run.commitment_reversal_guard_seconds
                 )
                 guard_seconds = config.run.commitment_reversal_guard_seconds
-                confirmation = (
-                    [
-                        row
-                        for row in run
-                        if float(row["source_timestamp_seconds"])
-                        >= float(stable[-1]["source_timestamp_seconds"])
-                        and float(row["source_timestamp_seconds"]) <= confirm_end
-                    ]
-                    if guard_seconds > 0
-                    else []
-                )
+                confirmation = []
+                if guard_seconds > 0:
+                    stable_end = float(stable[-1]["source_timestamp_seconds"])
+                    for row in run:
+                        row_time = float(row["source_timestamp_seconds"])
+                        if row_time < stable_end:
+                            continue
+                        confirmation.append(row)
+                        if row_time >= confirm_end - 1e-6:
+                            break
                 confirmed_through = (
                     (
                         bool(confirmation)
@@ -339,6 +339,8 @@ def build_round_summary(
                     or [_evidence(row) for row in stable],
                 }
                 break
+        if shift is not None and regroup is not None and commitment is not None:
+            break
 
     opening_confidence = (
         "candidate_partial_coverage"

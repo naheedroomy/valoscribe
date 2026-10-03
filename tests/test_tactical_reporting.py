@@ -7,6 +7,7 @@ from collections import Counter
 from pathlib import Path
 
 import numpy as np
+import pytest
 from typer.testing import CliRunner
 
 import valoscribe.tactical.cli as cli_module
@@ -208,6 +209,29 @@ def test_commitment_reversal_after_full_persistence_window_is_rejected() -> None
     )
 
 
+def test_non_aligned_commitment_guard_includes_first_sample_after_endpoint() -> None:
+    config, round_config, map_data = _setup()
+    config = config.model_copy(
+        update={"run": config.run.model_copy(update={"commitment_reversal_guard_seconds": 0.6})}
+    )
+    summary = build_round_summary(
+        round_config.round_id,
+        round_config,
+        config,
+        _samples(config, round_config),
+        report_root=Path("."),
+        map_data=map_data,
+    )
+    assert summary.apparent_commitment_site == "A"
+    guard = summary.commitment_evidence["reversal_check_window"]
+    guard_end = guard["end_timestamp_seconds"]
+    expected_endpoint = (
+        summary.commitment_evidence["persistence_window"]["end_timestamp_seconds"] + 0.6
+    )
+    assert guard_end >= expected_endpoint
+    assert guard_end == pytest.approx(expected_endpoint + 0.15)
+
+
 def test_zero_second_commitment_guard_is_explicitly_disabled() -> None:
     config, round_config, map_data = _setup()
     config = config.model_copy(
@@ -242,6 +266,31 @@ def test_shift_requires_stable_adjacent_baseline_and_candidate_onset_persistence
             row["macro_counts"].update({"A": 1, "B": 2})
         elif offset >= 12:
             row["macro_counts"].update({"A": 2, "B": 1})
+    summary = build_round_summary(
+        round_config.round_id,
+        round_config,
+        config,
+        rows,
+        report_root=Path("."),
+        map_data=map_data,
+    )
+    assert summary.first_major_shift_evidence is None
+
+
+def test_shift_persistence_cannot_borrow_a_later_streak_after_onset_fails() -> None:
+    config, round_config, map_data = _setup()
+    rows = _samples(config, round_config)
+    for row in rows:
+        offset = row["source_timestamp_seconds"] - round_config.source_start_seconds
+        if 6 <= offset < 6.5:
+            a_count = 3
+        elif 6.5 <= offset < 12:
+            a_count = 2
+        elif offset >= 12:
+            a_count = 3
+        else:
+            a_count = 1
+        row["macro_counts"].update({"A": a_count, "B": 3 - a_count})
     summary = build_round_summary(
         round_config.round_id,
         round_config,
@@ -318,6 +367,27 @@ def test_mid_shift_is_not_reported_as_a_site_regroup() -> None:
     )
     assert summary.first_major_shift_direction == "MID"
     assert summary.regroup_direction is None
+
+
+def test_mid_first_shift_does_not_suppress_later_a_regroup() -> None:
+    config, round_config, map_data = _setup()
+    rows = _samples(config, round_config)
+    for row in rows:
+        offset = row["source_timestamp_seconds"] - round_config.source_start_seconds
+        if 9 <= offset < 13:
+            row["macro_counts"].update({"A": 1, "MID": 3, "B": 0})
+        elif offset >= 13:
+            row["macro_counts"].update({"A": 3, "MID": 1, "B": 0})
+    summary = build_round_summary(
+        round_config.round_id,
+        round_config,
+        config,
+        rows,
+        report_root=Path("."),
+        map_data=map_data,
+    )
+    assert summary.first_major_shift_direction == "MID"
+    assert summary.regroup_direction == "A"
 
 
 def test_aggregate_keeps_included_excluded_denominators_and_unknown_round_ids(
