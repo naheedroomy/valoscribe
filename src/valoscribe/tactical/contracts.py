@@ -15,6 +15,7 @@ class Contract(BaseModel):
 class RawMarkerObservation(Contract):
     run_id: str
     round_id: str
+    team_id: str = "single-team"
     sample_index: int = Field(ge=0)
     source_frame_index: int | None = Field(default=None, ge=0)
     source_timestamp_seconds: float = Field(ge=0)
@@ -32,6 +33,7 @@ class TeamFrameState(Contract):
 
     run_id: str
     round_id: str
+    team_id: str = "single-team"
     sample_index: int = Field(ge=0)
     source_timestamp_seconds: float = Field(ge=0)
     observed_marker_count: int = Field(ge=0)
@@ -47,6 +49,7 @@ class CorrectionDelta(Contract):
     correction_id: str
     run_id: str
     round_id: str
+    team_id: str = "single-team"
     sample_index: int = Field(ge=0)
     operation: Literal["add", "remove", "move"]
     target_observation_id: str | None = None
@@ -92,6 +95,7 @@ class MarkerAdjudication(Contract):
     adjudication_id: str = Field(min_length=1)
     run_id: str
     round_id: str
+    team_id: str = "single-team"
     sample_index: int = Field(ge=0)
     target_observation_id: str = Field(min_length=1)
     disposition: Literal["supported", "deferred"]
