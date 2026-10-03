@@ -48,14 +48,31 @@ def _coverage_evidence(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _evidence(row: dict[str, Any]) -> dict[str, Any]:
-    return {
+    source_mode = bool(row.get("source_adjudication_mode"))
+    evidence = {
         "timestamp_seconds": float(row["source_timestamp_seconds"]),
         "sample_index": int(row["sample_index"]),
         "observed_marker_count": int(row["observed_marker_count"]),
         "macro_counts": _counts(row),
         "coverage_status": row["coverage_status"],
-        "source": "corrected" if row.get("corrected") else "raw_candidate",
+        "source": (
+            "source_adjudicated_observed_markers"
+            if source_mode
+            else "corrected"
+            if row.get("corrected")
+            else "raw_candidate"
+        ),
     }
+    if source_mode:
+        evidence["tactical_eligible_observation_ids"] = list(
+            row.get("tactical_eligible_observation_ids", [])
+        )
+        evidence["source_supported_observation_ids"] = list(
+            row.get("source_supported_observation_ids", [])
+        )
+        evidence["whole_frame_approved"] = bool(row.get("whole_frame_approved"))
+        evidence["adjudication_evidence"] = list(row.get("adjudication_evidence", []))
+    return evidence
 
 
 def _runs(
@@ -109,16 +126,39 @@ def build_round_summary(
 ) -> RoundMovementSummary:
     period = 1.0 / config.run.sample_fps
     live_start = round_config.source_start_seconds + round_config.live_start_offset_seconds
-    opening_window_rows: list[dict[str, Any]] = []
-    opening_usable_seconds = 0.0
-    for row in sorted(occupancy, key=lambda item: float(item["source_timestamp_seconds"])):
-        if float(row["source_timestamp_seconds"]) < live_start:
-            continue
-        opening_window_rows.append(row)
-        if _usable(row):
-            opening_usable_seconds += period
-        if opening_usable_seconds + 1e-6 >= config.run.opening_window_seconds:
+    # Unknown coverage consumes source-time budget, preventing later combat from becoming
+    # opening evidence. Only explicitly configured excluded intervals extend that budget.
+    opening_duration = config.run.opening_window_seconds
+    while True:
+        excluded_spans = sorted(
+            (
+                max(interval.start_seconds, live_start),
+                interval.end_seconds,
+            )
+            for interval in round_config.excluded_intervals
+            if interval.start_seconds <= live_start + opening_duration
+            and interval.end_seconds > live_start
+        )
+        excluded_seconds = 0.0
+        merged_end = live_start
+        for span_start, span_end in excluded_spans:
+            if span_end <= merged_end:
+                continue
+            excluded_seconds += span_end - max(span_start, merged_end)
+            merged_end = span_end
+        extended_duration = config.run.opening_window_seconds + excluded_seconds
+        if extended_duration <= opening_duration + 1e-6:
             break
+        opening_duration = extended_duration
+    opening_end = live_start + opening_duration
+    opening_window_rows: list[dict[str, Any]] = []
+    for row in sorted(occupancy, key=lambda item: float(item["source_timestamp_seconds"])):
+        timestamp = float(row["source_timestamp_seconds"])
+        if timestamp < live_start:
+            continue
+        if timestamp >= opening_end:
+            break
+        opening_window_rows.append(row)
     opening_rows = [row for row in opening_window_rows if _usable(row)]
     opening_counts: Counter[tuple[int, int, int]] = Counter(
         (_counts(row)["A"], _counts(row)["MID"], _counts(row)["B"]) for row in opening_rows
@@ -156,6 +196,7 @@ def build_round_summary(
     regroup: dict[str, Any] | None = None
     commitment: dict[str, Any] | None = None
     target_zones = map_data.get("commitment_zones", {"A": [], "B": []})
+    continuation_zones = map_data.get("commitment_continuation_zones", {})
     site_targets = {macro for macro, zones in target_zones.items() if zones}
     for run in observed_runs:
         if len(run) < 2:
@@ -296,14 +337,18 @@ def build_round_summary(
                 if not confirmed_through:
                     continue
                 opposite = "B" if site == "A" else "A"
+                guard_zones = [
+                    *target_zones[site],
+                    *continuation_zones.get(site, []),
+                ]
                 selected_site_held = all(
                     int(row["observed_marker_count"]) > 0
                     and sum(
-                        (row.get("zone_counts") or {}).get(zone, 0) for zone in target_zones[site]
+                        (row.get("zone_counts") or {}).get(zone, 0) for zone in guard_zones
                     )
                     >= 3
                     and sum(
-                        (row.get("zone_counts") or {}).get(zone, 0) for zone in target_zones[site]
+                        (row.get("zone_counts") or {}).get(zone, 0) for zone in guard_zones
                     )
                     / int(row["observed_marker_count"])
                     >= 0.60
@@ -330,7 +375,15 @@ def build_round_summary(
                     "evidence": _evidence(stable[-1]),
                     "persistence_window": _coverage_evidence(stable),
                     "reversal_check_window": (
-                        _coverage_evidence(confirmation)
+                        {
+                            **_coverage_evidence(confirmation),
+                            "accepted_continuation_zone_ids": continuation_zones.get(site, []),
+                            "guard_semantics": (
+                                "initiation zones or explicitly configured same-site "
+                                "continuation zones must retain at least three and 60% "
+                                "of observed markers"
+                            ),
+                        }
                         if confirmation
                         else {"disabled": True, "duration_seconds": 0.0, "sample_indices": []}
                     ),
@@ -344,8 +397,11 @@ def build_round_summary(
         if shift is not None and regroup is not None and commitment is not None:
             break
 
+    source_adjudicated = any(bool(row.get("source_adjudication_mode")) for row in occupancy)
     opening_confidence = (
-        "candidate_partial_coverage"
+        "source_adjudicated_observed_markers"
+        if source_adjudicated and opening_rows
+        else "candidate_partial_coverage"
         if opening_rows and any(row["coverage_status"] == "partial" for row in opening_rows)
         else "reviewed_coverage"
         if opening_rows
@@ -426,6 +482,16 @@ def build_round_summary(
         warnings=(
             (
                 [
+                    "Counts use source-supported markers or explicitly whole-frame-approved "
+                    "observations; they do not establish total-team occupancy.",
+                    "Deferred and unreviewed candidates remain reviewable but are excluded from "
+                    "tactical evidence.",
+                ]
+                if source_adjudicated
+                else []
+            )
+            + (
+                [
                     "Partial candidate observations do not establish complete-team occupancy.",
                     "Map calibration and detector remain pending human review.",
                 ]
@@ -450,6 +516,13 @@ def build_round_summary(
             "commitment_reversal_guard_seconds": config.run.commitment_reversal_guard_seconds,
             "strong_coverage_marker_count": config.run.strong_coverage_marker_count,
             "commitment_zones": target_zones,
+            "commitment_continuation_zones": continuation_zones,
+            "commitment_guard_semantics": (
+                "initiate and persist in commitment_zones; during the reversal guard, "
+                "retain at least three and 60% of observed markers across the selected "
+                "site's commitment_zones or explicitly configured continuation zones; "
+                "missing/unusable samples break continuity"
+            ),
         },
         evidence_paths={
             "minimap_playback": "minimap_playback.mp4",
@@ -628,9 +701,20 @@ def write_aggregate_report(
             "commitment_known_round_count": sum(commitments.values()),
             "opposite_presence_round_count": opposite["present"] + opposite["not_observed"],
         },
-        limitations=[
-            "Counts describe observed candidate occupancy, not complete rosters or tactical intent."
-        ],
+        limitations=["Counts describe observed markers, not complete rosters or tactical intent."]
+        + (
+            [
+                "Source-adjudicated counts use supported markers or explicitly "
+                "whole-frame-approved observations; deferred/unreviewed markers "
+                "are excluded, and partial support cannot establish absence."
+            ]
+            if any(
+                "Counts use source-supported markers" in warning
+                for item in eligible
+                for warning in item.warnings
+            )
+            else []
+        ),
     )
     (output_dir / "summary.json").write_text(
         summary.model_dump_json(indent=2) + "\n", encoding="utf-8"

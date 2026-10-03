@@ -558,7 +558,10 @@ def test_rebuild_generates_corrected_occupancy_without_detection(
         update={
             "run": config.run.model_copy(update={"run_id": "fixture"}),
             "source": config.source.model_copy(update={"video_path": source}),
-            "rounds": [config.rounds[0].model_copy(update={"round_id": "map3-round4"})],
+            "rounds": [config.rounds[0].model_copy(update={
+                "round_id": "map3-round4", "source_start_seconds": 0.0,
+                "source_end_seconds": 0.3, "live_start_offset_seconds": 0.0,
+            })],
         }
     )
     run_dir = tmp_path / "run"
@@ -570,12 +573,14 @@ def test_rebuild_generates_corrected_occupancy_without_detection(
         "round_id": "map3-round4",
         "sample_index": 0,
         "source_timestamp_seconds": 0.0,
-        "canonical_x": 1100.0,
-        "canonical_y": 800.0,
+        "canonical_x": 950.0,
+        "canonical_y": 500.0,
         "crop_x": 1.0,
         "crop_y": 1.0,
         "confidence": 0.7,
     }
+    deferred_row = {**raw_row, "canonical_x": 1200.0}
+    unreviewed_row = {**raw_row, "canonical_x": 1300.0}
     null_row = {
         **raw_row,
         "sample_index": 1,
@@ -584,7 +589,9 @@ def test_rebuild_generates_corrected_occupancy_without_detection(
         "quality_flags": ["transform_out_of_bounds"],
     }
     raw_path = round_dir / "raw_observations.jsonl"
-    raw_payload = json.dumps(raw_row) + "\n" + json.dumps(null_row) + "\n"
+    raw_payload = "".join(
+        json.dumps(row) + "\n" for row in (raw_row, deferred_row, unreviewed_row, null_row)
+    )
     raw_path.write_text(raw_payload)
     (round_dir / "sample_coverage.jsonl").write_text(
         json.dumps(
@@ -592,7 +599,7 @@ def test_rebuild_generates_corrected_occupancy_without_detection(
                 "sample_index": 0,
                 "source_timestamp_seconds": 0.0,
                 "coverage_status": "partial",
-                "observed_marker_count": 1,
+                "observed_marker_count": 3,
                 "warning": "unreviewed",
             }
         )
@@ -613,6 +620,42 @@ def test_rebuild_generates_corrected_occupancy_without_detection(
         ).model_dump_json()
         + "\n"
     )
+    from valoscribe.tactical.contracts import MarkerAdjudication
+
+    initial_adjudication = MarkerAdjudication(
+        adjudication_id="initial-support",
+        run_id="fixture",
+        round_id="map3-round4",
+        sample_index=0,
+        target_observation_id="map3-round4:0:0",
+        disposition="supported",
+        reviewer="reviewer",
+        source_locator="fixture/frame/0",
+        source_timestamp_seconds=0.0,
+        confidence=0.9,
+    )
+    deferred_adjudication = initial_adjudication.model_copy(
+        update={
+            "adjudication_id": "initial-deferred",
+            "target_observation_id": "map3-round4:0:1",
+            "disposition": "deferred",
+        }
+    )
+    invalid_position_support = initial_adjudication.model_copy(
+        update={
+            "adjudication_id": "invalid-position-support",
+            "sample_index": 1,
+            "target_observation_id": "map3-round4:1:3",
+            "source_frame_index": None,
+        }
+    )
+    adjudication_path = round_dir / "marker_adjudications.jsonl"
+    initial_adjudication_snapshot = (
+        initial_adjudication.model_dump_json() + "\n"
+        + deferred_adjudication.model_dump_json() + "\n"
+        + invalid_position_support.model_dump_json() + "\n"
+    )
+    adjudication_path.write_text(initial_adjudication_snapshot)
     monkeypatch.setattr(detector, "detect_markers", lambda *args: pytest.fail("detector invoked"))
     import valoscribe.tactical.corrections as correction_module
 
@@ -630,12 +673,17 @@ def test_rebuild_generates_corrected_occupancy_without_detection(
                 sample_index=0,
                 operation="remove",
                 target_observation_id="map3-round4:0:0",
-                original_canonical_x=1100.0,
-                original_canonical_y=800.0,
+                original_canonical_x=950.0,
+                original_canonical_y=500.0,
                 reviewer="concurrent-reviewer",
             )
             with (round_dir / "corrections.jsonl").open("a", encoding="utf-8") as stream:
                 stream.write(late_delta.model_dump_json() + "\n")
+            late_adjudication = initial_adjudication.model_copy(
+                update={"adjudication_id": "late-defer", "disposition": "deferred"}
+            )
+            with adjudication_path.open("a", encoding="utf-8") as stream:
+                stream.write(late_adjudication.model_dump_json() + "\n")
             appended = True
 
     monkeypatch.setattr(correction_module, "_write_playbacks", append_after_snapshot)
@@ -651,6 +699,12 @@ def test_rebuild_generates_corrected_occupancy_without_detection(
     second = rebuild_round(run_dir, "map3-round4", config)
     assert first["detector_invoked"] is False
     assert first["correction_count"] == 0
+    assert first["adjudication_count"] == 3
+    assert first["source_adjudication_mode"] is True
+    assert (Path(first["revision_directory"]) / "marker_adjudications.jsonl").read_text() == (
+        initial_adjudication_snapshot
+    )
+    assert first["marker_adjudications_sha256"] != second["marker_adjudications_sha256"]
     assert (
         first["corrections_sha256"]
         == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
@@ -668,35 +722,78 @@ def test_rebuild_generates_corrected_occupancy_without_detection(
     with (revision / "occupancy.csv").open(encoding="utf-8") as stream:
         occupancy = list(csv.DictReader(stream))
     assert occupancy[0]["coverage_status"] == "partial"
-    assert json.loads(occupancy[0]["warnings"]) == ["unreviewed"]
+    assert int(occupancy[0]["candidate_observed_marker_count"]) == 3
+    assert int(occupancy[0]["observed_marker_count"]) == 1
+    assert json.loads(occupancy[0]["source_supported_observation_ids"]) == [
+        "map3-round4:0:0"
+    ]
+    assert json.loads(occupancy[0]["tactical_eligible_observation_ids"]) == [
+        "map3-round4:0:0"
+    ]
+    assert float(occupancy[0]["centroid_x"]) == pytest.approx(950.0)
+    assert float(occupancy[0]["spread"]) == pytest.approx(0.0)
+    assert sum(json.loads(occupancy[0]["macro_counts"]).values()) == 1
+    assert json.loads(occupancy[0]["warnings"]) == [
+        "unreviewed",
+        "tactical evidence uses source-supported markers or whole-frame-approved observations",
+    ]
     assert occupancy[1]["coverage_status"] == "unknown"
+    assert int(occupancy[1]["candidate_observed_marker_count"]) == 1
+    assert int(occupancy[1]["observed_marker_count"]) == 0
+    assert json.loads(occupancy[1]["tactical_eligible_observation_ids"]) == []
     assert "lack canonical coordinates" in occupancy[1]["warnings"]
+    summary = json.loads((revision / "summary.json").read_text())
+    assert sum(summary["opening_distribution"].values()) == 1
     assert raw_path.read_text() == raw_payload
     corrected = [
         json.loads(line)
         for line in (revision / "corrected_observations.jsonl").read_text().splitlines()
     ]
-    assert corrected[1]["canonical_x"] is None
+    assert next(row for row in corrected if row["sample_index"] == 1)["canonical_x"] is None
     second_corrected = [
         json.loads(line)
         for line in (Path(second["revision_directory"]) / "corrected_observations.jsonl")
         .read_text()
         .splitlines()
     ]
-    assert not any(row["sample_index"] == 0 for row in second_corrected)
+    assert sum(row["sample_index"] == 0 for row in second_corrected) == 2
     with (Path(second["revision_directory"]) / "occupancy.csv").open(encoding="utf-8") as stream:
         second_occupancy = list(csv.DictReader(stream))
     assert second_occupancy[0]["corrected"] == "True"
+    assert int(second_occupancy[0]["observed_marker_count"]) == 0
+    assert second_occupancy[0]["coverage_status"] == "unknown"
+    assert json.loads(second_occupancy[0]["macro_counts"]) == {
+        "A": 0, "MID": 0, "B": 0, "SPAWN": 0, "OTHER": 0
+    }
     assert any("CORRECTED" in caption for caption in playback_captions)
 
 
-def test_corrected_playback_captions_use_derived_coverage_and_warnings(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_corrected_playback_captions_preserve_evidence_pixels(tmp_path: Path, monkeypatch) -> None:
+    from types import SimpleNamespace
+
     import valoscribe.tactical.corrections as corrections
 
     config, _ = load_config(ROOT / "configs/examples/ascent-team-movement.example.yaml")
-    captured: list[str] = []
+    config = config.model_copy(
+        update={
+            "broadcast": config.broadcast.model_copy(
+                update={
+                    "minimap_crop": config.broadcast.minimap_crop.model_copy(
+                        update={"width": 334, "height": 334}
+                    ),
+                    "transform": config.broadcast.transform.model_copy(
+                        update={"matrix": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]}
+                    ),
+                }
+            )
+        }
+    )
+    source_frame = np.full((1080, 1920, 3), (20, 40, 60), dtype=np.uint8)
+    source_frame[50 + 30, 70 + 200] = (150, 20, 10)
+    source_frame[50 + 320, 70 + 200] = (12, 200, 90)
+    output_frames: list[np.ndarray] = []
+    writer_sizes: list[tuple[int, int]] = []
+    drawn_text: list[tuple[str, tuple[int, int], tuple[int, ...], float]] = []
 
     class Capture:
         def isOpened(self):  # noqa: N802
@@ -706,7 +803,7 @@ def test_corrected_playback_captions_use_derived_coverage_and_warnings(
             return True
 
         def read(self):
-            return True, np.zeros((1080, 1920, 3), dtype=np.uint8)
+            return True, source_frame.copy()
 
         def release(self):
             pass
@@ -715,8 +812,8 @@ def test_corrected_playback_captions_use_derived_coverage_and_warnings(
         def isOpened(self):  # noqa: N802
             return True
 
-        def write(self, _frame):
-            pass
+        def write(self, frame):
+            output_frames.append(frame.copy())
 
         def release(self):
             pass
@@ -724,14 +821,19 @@ def test_corrected_playback_captions_use_derived_coverage_and_warnings(
     class WriterFactory:
         fourcc = staticmethod(cv2.VideoWriter.fourcc)
 
-        def __new__(cls, *_args):
+        def __new__(cls, _path, _codec, _fps, size):
+            writer_sizes.append(size)
             return Writer()
 
     monkeypatch.setattr(cv2, "VideoCapture", lambda _source: Capture())
     monkeypatch.setattr(cv2, "VideoWriter", WriterFactory)
-    monkeypatch.setattr(cv2, "putText", lambda _image, text, *_args: captured.append(text))
-    monkeypatch.setattr(cv2, "circle", lambda *_args: None)
-    monkeypatch.setattr(cv2, "polylines", lambda *_args: None)
+    original_put_text = cv2.putText
+
+    def capture_text(image, text, origin, font, scale, color, thickness):
+        drawn_text.append((text, origin, image.shape, scale))
+        return original_put_text(image, text, origin, font, scale, color, thickness)
+
+    monkeypatch.setattr(cv2, "putText", capture_text)
     monkeypatch.setattr(cv2, "solve", lambda *_args: np.eye(2))
 
     frames = [
@@ -743,28 +845,89 @@ def test_corrected_playback_captions_use_derived_coverage_and_warnings(
         },
         {"sample_index": 1, "source_timestamp_seconds": 2.0, "coverage_status": "partial"},
     ]
+    summary = SimpleNamespace(
+        first_major_shift_evidence={"after": {"sample_index": 0}},
+        first_major_shift_direction="A",
+        commitment_evidence={"sample": {"sample_index": 0}},
+        apparent_commitment_site="A",
+    )
     corrections._write_playbacks(
         tmp_path,
         "round",
         tmp_path,
         config,
-        np.zeros((64, 64, 3), dtype=np.uint8),
-        {"zones": []},
+        np.full((512, 512, 3), (45, 55, 65), dtype=np.uint8),
+        {
+            "zones": [
+                {
+                    "zone_id": "a_main",
+                    "name": "A Main",
+                    "macro_group": "A",
+                    "vertices_px": [[0, 0], [300, 0], [300, 300], [0, 300]],
+                }
+            ]
+        },
         {
             0: [
-                {"canonical_x": 100.0, "canonical_y": 100.0},
+                {"canonical_x": 100.0, "canonical_y": 8.0, "tactical_eligible": True},
+                {
+                    "canonical_x": 120.0,
+                    "canonical_y": 325.0,
+                    "tactical_eligible": False,
+                    "adjudication_disposition": "deferred",
+                },
                 {"canonical_x": None, "canonical_y": None},
             ],
             1: [{"canonical_x": None, "canonical_y": None}],
         },
         frames,
         set(),
+        summary=summary,
+        source_adjudication_mode=True,
     )
 
-    assert sum("coverage=partial" in text for text in captured) == 2
-    assert sum("coverage=unknown" in text for text in captured) == 2
-    assert sum("1 observation(s) lack canonical coordinates" in text for text in captured) == 4
-    assert sum("detector warning" in text for text in captured) == 2
+    minimap, canonical = output_frames[0], output_frames[1]
+    strip_height = corrections.CAPTION_STRIP_HEIGHT
+    assert writer_sizes == [(334, 334 + strip_height), (512, 512 + strip_height)]
+    assert minimap.shape == (334 + strip_height, 334, 3)
+    assert canonical.shape == (512 + strip_height, 512, 3)
+    assert tuple(minimap[strip_height + 30, 200]) == (150, 20, 10)
+    assert tuple(minimap[strip_height + 320, 200]) == (12, 200, 90)
+    green_pixels = np.count_nonzero(
+        np.all(minimap[strip_height + 1 : strip_height + 16, 93:108] == (0, 255, 0), axis=2)
+    )
+    orange_pixels = np.count_nonzero(
+        np.all(
+            minimap[strip_height + 315 : strip_height + 334, 113:128] == (0, 165, 255),
+            axis=2,
+        )
+    )
+    assert green_pixels > 0 and orange_pixels > 0
+    assert tuple(canonical[strip_height + 500, 500]) == (45, 55, 65)
+    for text, (x, y), (height, width, _channels), scale in drawn_text:
+        (text_width, text_height), _baseline = cv2.getTextSize(
+            text, cv2.FONT_HERSHEY_SIMPLEX, scale, 1
+        )
+        assert x >= 0 and x + text_width <= width
+        assert 0 <= y <= height and y - text_height >= 0
+    canonical_strip_text = [
+        (text, origin[1])
+        for text, origin, shape, _scale in drawn_text
+        if shape == (strip_height, 512, 3)
+    ]
+    phase_positions = [y for text, y in canonical_strip_text if text.startswith("phase:")]
+    regular_positions = [y for text, y in canonical_strip_text if not text.startswith("phase:")]
+    assert len(phase_positions) == 2
+    assert min(phase_positions) - max(regular_positions) >= 12
+    rendered_caption_text = " ".join(text for text, _y in canonical_strip_text)
+    assert "team:" in rendered_caption_text and "side:" in rendered_caption_text
+    assert "coverage:" in rendered_caption_text and "eligible=" in rendered_caption_text
+    assert "green=eligible evidence" in rendered_caption_text
+    assert "macro counts:" in rendered_caption_text
+    with pytest.raises(ValueError, match="fixed caption strip"):
+        corrections._caption_frame(
+            np.zeros((334, 334, 3), dtype=np.uint8), ["overflow"] * 100, scale=0.31
+        )
 
 
 def load_config_data(payload: dict) -> None:

@@ -206,16 +206,26 @@ def load_map_config(path: Path) -> dict[str, Any]:
     data = json.loads(path.read_text(encoding="utf-8"))
     if data.get("map_id") != "ascent" or not isinstance(data.get("zones"), list):
         raise ValueError("map config must define Ascent zones")
-    commitment_zones = data.get("commitment_zones", {})
     zone_ids = {zone.get("zone_id") for zone in data["zones"]}
-    for macro, zone_list in commitment_zones.items():
-        if macro not in {"A", "B"} or not isinstance(zone_list, list):
-            raise ValueError("commitment_zones must map A/B to zone ID lists")
-        if any(zone_id not in zone_ids for zone_id in zone_list):
-            raise ValueError(f"commitment_zones.{macro} references an unknown zone")
+    zone_macros = {zone.get("zone_id"): zone.get("macro_group") for zone in data["zones"]}
     for zone in data["zones"]:
         if not zone.get("zone_id") or len(zone.get("vertices_px", [])) < 3:
             raise ValueError("each zone needs an id and at least three vertices")
         if zone.get("macro_group") not in {"A", "MID", "B", "SPAWN"}:
             raise ValueError("each zone needs a supported macro group")
+    for key, field in (
+        ("commitment_zones", "commitment_zones"),
+        ("commitment_continuation_zones", "commitment_continuation_zones"),
+    ):
+        zone_groups = data.get(key, {})
+        if not isinstance(zone_groups, dict):
+            raise ValueError(f"{field} must map A/B to zone ID lists")
+        for macro, zone_list in zone_groups.items():
+            if macro not in {"A", "B"} or not isinstance(zone_list, list):
+                raise ValueError(f"{field} must map A/B to zone ID lists")
+            for zone_id in zone_list:
+                if zone_id not in zone_ids:
+                    raise ValueError(f"{field}.{macro} references an unknown zone")
+                if zone_macros[zone_id] != macro:
+                    raise ValueError(f"{field}.{macro} zone must belong to macro {macro}")
     return cast(dict[str, Any], data)

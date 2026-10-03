@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import math
 import uuid
 from collections import Counter
 from pathlib import Path
@@ -15,7 +16,12 @@ import numpy as np
 from pydantic import BaseModel
 
 from valoscribe.tactical.config import TacticalConfig
-from valoscribe.tactical.contracts import CorrectionDelta, ReviewedFrame
+from valoscribe.tactical.contracts import (
+    CorrectionDelta,
+    MarkerAdjudication,
+    ReviewedFrame,
+    SourceAdjudicationMode,
+)
 from valoscribe.tactical.pipeline import assign_zone, load_assets, resolve_path
 from valoscribe.tactical.reporting import write_round_report
 
@@ -72,6 +78,20 @@ def validate_delta(
         x, y = delta.corrected_canonical_x, delta.corrected_canonical_y
         if x is None or y is None or not (0 <= x < width and 0 <= y < height):
             raise ValueError("corrected marker coordinates are missing or outside canonical map")
+        raw_ids = {
+            observation_id(delta.round_id, int(row["sample_index"]), ordinal)
+            for ordinal, row in enumerate(raw)
+            if row.get("round_id") == delta.round_id
+        }
+        historical_ids = {
+            str(prior["correction_id"])
+            for prior in existing_deltas or []
+            if prior.get("run_id") == delta.run_id
+            and prior.get("round_id") == delta.round_id
+            and prior.get("operation") in {"add", "move"}
+        }
+        if delta.correction_id in raw_ids or delta.correction_id in historical_ids:
+            raise ValueError("correction id collides with an existing observation or correction")
     if delta.operation in {"remove", "move"}:
         if not delta.target_observation_id:
             raise ValueError("remove/move correction requires a target observation id")
@@ -117,6 +137,119 @@ def validate_delta(
             raise ValueError("correction original position does not match current observation")
 
 
+def _valid_canonical_position(row: dict[str, Any], config: TacticalConfig) -> bool:
+    x, y = row.get("canonical_x"), row.get("canonical_y")
+    return (
+        isinstance(x, (int, float))
+        and isinstance(y, (int, float))
+        and math.isfinite(float(x))
+        and math.isfinite(float(y))
+        and 0 <= float(x) < config.map.canonical_width
+        and 0 <= float(y) < config.map.canonical_height
+    )
+
+
+def validate_adjudication(
+    adjudication: MarkerAdjudication,
+    raw: list[dict[str, Any]],
+    coverage: list[dict[str, Any]],
+    config: TacticalConfig,
+    existing: list[dict[str, Any]],
+    corrections: list[dict[str, Any]] | None = None,
+) -> None:
+    if adjudication.run_id != config.run.run_id:
+        raise ValueError("adjudication run_id does not match run configuration")
+    if not any(item.round_id == adjudication.round_id for item in config.rounds):
+        raise ValueError(f"unknown adjudication round: {adjudication.round_id}")
+    if any(row.get("adjudication_id") == adjudication.adjudication_id for row in existing):
+        raise ValueError(f"duplicate adjudication id: {adjudication.adjudication_id}")
+    frame = next(
+        (row for row in coverage if int(row["sample_index"]) == adjudication.sample_index), None
+    )
+    if frame is None:
+        raise ValueError("adjudication sample has no frame evidence")
+    if abs(float(frame["source_timestamp_seconds"]) - adjudication.source_timestamp_seconds) > 1e-6:
+        raise ValueError("adjudication source timestamp does not match sampled frame")
+    if frame.get("coverage_status") == "excluded":
+        raise ValueError("excluded frames cannot receive marker adjudications")
+    target_ids = {
+        observation_id(adjudication.round_id, adjudication.sample_index, ordinal)
+        for ordinal, row in enumerate(raw)
+        if row.get("round_id") == adjudication.round_id
+        and int(row.get("sample_index", -1)) == adjudication.sample_index
+    }
+    for correction in corrections or []:
+        if (
+            correction.get("round_id") != adjudication.round_id
+            or int(correction.get("sample_index", -1)) != adjudication.sample_index
+        ):
+            continue
+        if correction.get("operation") in {"remove", "move"}:
+            target_ids.discard(str(correction.get("target_observation_id")))
+        if correction.get("operation") in {"add", "move"}:
+            target_ids.add(str(correction["correction_id"]))
+    if adjudication.target_observation_id not in target_ids:
+        raise ValueError("adjudication target observation does not exist in this frame")
+    if adjudication.source_frame_index is not None:
+        target = next(
+            (
+                row
+                for ordinal, row in enumerate(raw)
+                if observation_id(adjudication.round_id, adjudication.sample_index, ordinal)
+                == adjudication.target_observation_id
+            ),
+            None,
+        )
+        if (
+            target is not None
+            and target.get("source_frame_index") != adjudication.source_frame_index
+        ):
+            raise ValueError("adjudication source frame does not match target observation")
+
+
+def _activate_source_adjudication_mode(run_dir: Path, run_id: str, round_id: str) -> bytes:
+    mode_path = run_dir / "source_adjudication_mode.json"
+    previous = mode_path.read_bytes() if mode_path.exists() else b""
+    if previous:
+        mode = SourceAdjudicationMode.model_validate_json(previous)
+        if mode.run_id != run_id:
+            raise ValueError("source-adjudication mode run_id does not match run configuration")
+        round_ids = set(mode.round_ids)
+    else:
+        round_ids = set()
+    round_ids.add(round_id)
+    updated = SourceAdjudicationMode(run_id=run_id, round_ids=tuple(sorted(round_ids)))
+    temporary = mode_path.with_name(f".{mode_path.name}.{uuid.uuid4().hex}.tmp")
+    temporary.write_text(updated.model_dump_json(indent=2) + "\n", encoding="utf-8")
+    temporary.replace(mode_path)
+    return mode_path.read_bytes()
+
+
+def append_adjudications(
+    round_dir: Path,
+    adjudications: Sequence[MarkerAdjudication],
+    config: TacticalConfig,
+    round_id: str,
+) -> None:
+    if not any(item.round_id == round_id for item in config.rounds):
+        raise ValueError(f"unknown adjudication round: {round_id}")
+    if not round_dir.is_dir():
+        raise ValueError(f"round directory does not exist: {round_id}")
+    raw = _read_jsonl(round_dir / "raw_observations.jsonl")
+    coverage = _read_jsonl(round_dir / "sample_coverage.jsonl")
+    corrections = _read_jsonl(round_dir / "corrections.jsonl")
+    path = round_dir / "marker_adjudications.jsonl"
+    history = _read_jsonl(path)
+    for item in adjudications:
+        if item.round_id != round_id:
+            raise ValueError("adjudication round_id does not match command round")
+        validate_adjudication(item, raw, coverage, config, history, corrections)
+        history.append(item.model_dump(mode="json"))
+    _activate_source_adjudication_mode(round_dir.parent.parent, config.run.run_id, round_id)
+    path.touch(exist_ok=True)
+    _append_records(path, adjudications)
+
+
 def corrected_rows(
     round_dir: Path,
     round_id: str,
@@ -124,6 +257,8 @@ def corrected_rows(
     correction_history: list[dict[str, Any]] | None = None,
     review_history: list[dict[str, Any]] | None = None,
     raw_history: list[dict[str, Any]] | None = None,
+    adjudication_history: list[dict[str, Any]] | None = None,
+    coverage_history: list[dict[str, Any]] | None = None,
 ) -> tuple[list[dict], set[int]]:
     run_id = config.run.run_id
     raw = (
@@ -131,7 +266,11 @@ def corrected_rows(
         if raw_history is not None
         else _read_jsonl(round_dir / "raw_observations.jsonl")
     )
-    coverage = _read_jsonl(round_dir / "sample_coverage.jsonl")
+    coverage = (
+        coverage_history
+        if coverage_history is not None
+        else _read_jsonl(round_dir / "sample_coverage.jsonl")
+    )
     timestamps = {
         int(row["sample_index"]): float(row["source_timestamp_seconds"]) for row in coverage
     }
@@ -157,6 +296,62 @@ def corrected_rows(
         if review_history is not None
         else _read_jsonl(round_dir / "reviewed_frames.jsonl")
     )
+    adjudication_path = round_dir / "marker_adjudications.jsonl"
+    adjudication_mode = adjudication_history is not None or adjudication_path.exists()
+    adjudication_records = (
+        adjudication_history if adjudication_history is not None else _read_jsonl(adjudication_path)
+    )
+    adjudications = [MarkerAdjudication.model_validate(row) for row in adjudication_records]
+    known_ids = {
+        observation_id(round_id, int(row["sample_index"]), ordinal): int(row["sample_index"])
+        for ordinal, row in enumerate(raw)
+        if row.get("round_id") == round_id
+    }
+    known_ids.update(
+        {
+            str(delta.correction_id): delta.sample_index
+            for delta in corrections
+            if delta.operation in {"add", "move"}
+        }
+    )
+    effective_adjudications: dict[str, MarkerAdjudication] = {}
+    seen_ids: set[str] = set()
+    for adjudication in adjudications:
+        if adjudication.run_id != run_id or adjudication.round_id != round_id:
+            raise ValueError("adjudication run_id/round_id does not match its run directory")
+        if adjudication.sample_index not in sample_indices:
+            raise ValueError("adjudication refers to a sample with no sampled frame evidence")
+        if adjudication.adjudication_id in seen_ids:
+            raise ValueError(f"duplicate adjudication id: {adjudication.adjudication_id}")
+        seen_ids.add(adjudication.adjudication_id)
+        if (
+            abs(timestamps[adjudication.sample_index] - adjudication.source_timestamp_seconds)
+            > 1e-6
+        ):
+            raise ValueError("adjudication source timestamp does not match sampled frame")
+        frame_evidence = next(
+            row for row in coverage if int(row["sample_index"]) == adjudication.sample_index
+        )
+        if frame_evidence.get("coverage_status") == "excluded":
+            raise ValueError("excluded frames cannot receive marker adjudications")
+        if adjudication.source_frame_index is not None:
+            raw_target = next(
+                (
+                    raw_row
+                    for ordinal, raw_row in enumerate(raw)
+                    if observation_id(round_id, int(raw_row["sample_index"]), ordinal)
+                    == adjudication.target_observation_id
+                ),
+                None,
+            )
+            if (
+                raw_target is not None
+                and raw_target.get("source_frame_index") != adjudication.source_frame_index
+            ):
+                raise ValueError("adjudication source frame does not match target observation")
+        if known_ids.get(adjudication.target_observation_id) != adjudication.sample_index:
+            raise ValueError("adjudication target observation does not exist in this frame")
+        effective_adjudications[adjudication.target_observation_id] = adjudication
     reviewed = [ReviewedFrame.model_validate(row) for row in review_records]
     if any(item.run_id != run_id or item.round_id != round_id for item in reviewed):
         raise ValueError("review record run_id/round_id does not match its run directory")
@@ -166,10 +361,10 @@ def corrected_rows(
     for ordinal, raw_row in enumerate(raw):
         if raw_row["round_id"] != round_id:
             continue
-        item = dict(raw_row)
-        item["observation_id"] = observation_id(round_id, item["sample_index"], ordinal)
-        item["source"] = "raw"
-        rows.append(item)
+        raw_item = dict(raw_row)
+        raw_item["observation_id"] = observation_id(round_id, raw_item["sample_index"], ordinal)
+        raw_item["source"] = "raw"
+        rows.append(raw_item)
     for delta in corrections:
         if delta.run_id != run_id or delta.round_id != round_id:
             continue
@@ -229,7 +424,7 @@ def corrected_rows(
         if frame["coverage_status"] not in {"good", "partial"}:
             raise ValueError("only good or partial frames can be explicitly approved")
         if any(
-            row.get("canonical_x") is None or row.get("canonical_y") is None
+            not _valid_canonical_position(row, config)
             for row in rows
             if int(row["sample_index"]) == reviewed_item.sample_index
         ):
@@ -237,6 +432,26 @@ def corrected_rows(
                 "cannot approve a frame with observations missing canonical coordinates"
             )
         approved_samples.add(reviewed_item.sample_index)
+    for row in rows:
+        effective_adjudication = effective_adjudications.get(row["observation_id"])
+        row["source_adjudication_mode"] = adjudication_mode
+        row["adjudication_disposition"] = (
+            effective_adjudication.disposition if effective_adjudication else None
+        )
+        row["adjudication_evidence"] = (
+            effective_adjudication.model_dump(mode="json") if effective_adjudication else None
+        )
+        row["tactical_eligible"] = (
+            (
+                not adjudication_mode
+                or int(row["sample_index"]) in approved_samples
+                or bool(
+                    effective_adjudication
+                    and effective_adjudication.disposition == "supported"
+                )
+            )
+            and (not adjudication_mode or _valid_canonical_position(row, config))
+        )
     return rows, approved_samples
 
 
@@ -244,6 +459,9 @@ def _effective_coverage(
     frame: dict[str, Any],
     observations: list[dict[str, Any]],
     approved_samples: set[int],
+    *,
+    source_adjudication_mode: bool = False,
+    eligible_count: int | None = None,
 ) -> tuple[str, list[str]]:
     points = [
         obs
@@ -255,6 +473,10 @@ def _effective_coverage(
     status = (
         "excluded"
         if frame["coverage_status"] == "excluded"
+        else "unknown"
+        if source_adjudication_mode and sample not in approved_samples and not eligible_count
+        else "partial"
+        if source_adjudication_mode and sample not in approved_samples
         else "good"
         if sample in approved_samples
         else "unknown"
@@ -266,9 +488,85 @@ def _effective_coverage(
     warnings = [frame["warning"]] if frame.get("warning") else []
     if unavailable:
         warnings.append(f"{unavailable} observation(s) lack canonical coordinates")
+    if source_adjudication_mode:
+        warnings.append(
+            "tactical evidence uses source-supported markers or whole-frame-approved observations"
+        )
     if sample not in approved_samples and frame["coverage_status"] != "excluded" and not warnings:
         warnings.append("frame not explicitly approved")
     return status, warnings
+
+
+CAPTION_STRIP_HEIGHT = 224
+
+
+def _caption_lines(
+    width: int, lines: list[str], *, scale: float, strip_height: int
+) -> list[str]:
+    """Wrap caption text to the actual frame width instead of clipping it."""
+    width -= 12
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    wrapped: list[str] = []
+    for text in lines:
+        words = text.split()
+        current = ""
+        for word in words:
+            candidate = f"{current} {word}".strip()
+            if cv2.getTextSize(candidate, font, scale, 1)[0][0] <= width:
+                current = candidate
+                continue
+            if current:
+                wrapped.append(current)
+                current = ""
+            fragment = ""
+            for character in word:
+                candidate = fragment + character
+                if fragment and cv2.getTextSize(candidate, font, scale, 1)[0][0] > width:
+                    wrapped.append(fragment)
+                    fragment = character
+                else:
+                    fragment = candidate
+            current = fragment
+        if current:
+            wrapped.append(current)
+    line_height = max(cv2.getTextSize("Ag", font, scale, 1)[0][1] + 4, 10)
+    if len(wrapped) * line_height + 8 > strip_height:
+        raise ValueError("playback captions exceed the fixed caption strip")
+    return wrapped
+
+
+def _caption_frame(
+    image: np.ndarray,
+    lines: list[str],
+    *,
+    scale: float,
+    phase_lines: list[str] | None = None,
+) -> np.ndarray:
+    """Add a fixed caption strip without painting over source or map pixels."""
+    phase_labels = [f"phase: {line}" for line in (phase_lines or [])]
+    regular = _caption_lines(
+        image.shape[1], lines, scale=scale, strip_height=CAPTION_STRIP_HEIGHT
+    )
+    phases = _caption_lines(
+        image.shape[1], phase_labels, scale=scale, strip_height=CAPTION_STRIP_HEIGHT
+    )
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    line_height = max(cv2.getTextSize("Ag", font, scale, 1)[0][1] + 4, 10)
+    if (len(regular) + len(phases)) * line_height + 8 > CAPTION_STRIP_HEIGHT:
+        raise ValueError("playback captions and phase annotations exceed the fixed caption strip")
+    strip = np.zeros((CAPTION_STRIP_HEIGHT, image.shape[1], 3), dtype=image.dtype)
+    for index, text in enumerate(regular + phases):
+        color = (0, 255, 255) if index >= len(regular) else (255, 255, 255)
+        cv2.putText(
+            strip,
+            text,
+            (6, 4 + (index + 1) * line_height - 2),
+            font,
+            scale,
+            color,
+            1,
+        )
+    return np.concatenate((strip, image), axis=0)
 
 
 def _write_playbacks(
@@ -283,27 +581,39 @@ def _write_playbacks(
     approved_samples: set[int],
     corrected_samples: set[int] | None = None,
     summary=None,
+    source_adjudication_mode: bool = False,
 ) -> None:
     source = resolve_path(config.source.video_path)
     crop = config.broadcast.minimap_crop
     matrix = np.asarray(config.broadcast.transform.matrix, dtype=np.float64)
     zone_frame = asset.copy()
     for zone in map_data["zones"]:
-        polygon = np.asarray(zone["vertices_px"], dtype=np.int32).reshape((-1, 1, 2))
+        vertices = np.asarray(zone["vertices_px"], dtype=np.int32)
+        polygon = vertices.reshape((-1, 1, 2))
         cv2.polylines(zone_frame, [polygon], True, (255, 150, 40), 2)
+        label_position = tuple(np.rint(vertices.mean(axis=0)).astype(int))
+        cv2.putText(
+            zone_frame,
+            str(zone.get("name", zone["zone_id"])),
+            label_position,
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.38,
+            (255, 255, 255),
+            1,
+        )
     mini_path = round_dir / "corrected_minimap.mp4"
     canonical_path = round_dir / "corrected_canonical.mp4"
     mini_writer = cv2.VideoWriter(
         str(mini_path),
         cv2.VideoWriter.fourcc(*"mp4v"),
         config.run.sample_fps,
-        (crop.width, crop.height),
+        (crop.width, crop.height + CAPTION_STRIP_HEIGHT),
     )
     map_writer = cv2.VideoWriter(
         str(canonical_path),
         cv2.VideoWriter.fourcc(*"mp4v"),
         config.run.sample_fps,
-        (asset.shape[1], asset.shape[0]),
+        (asset.shape[1], asset.shape[0] + CAPTION_STRIP_HEIGHT),
     )
     cap = cv2.VideoCapture(str(source))
     if not mini_writer.isOpened() or not map_writer.isOpened() or not cap.isOpened():
@@ -320,34 +630,59 @@ def _write_playbacks(
                 raise ValueError(f"source frame unavailable at {timestamp:.3f}s")
             minimap = image[crop.y : crop.y + crop.height, crop.x : crop.x + crop.width].copy()
             map_image = zone_frame.copy()
+            sample_observations = canonical_by_sample.get(int(frame["sample_index"]), [])
+            source_mode = source_adjudication_mode
             status, warnings = _effective_coverage(
                 frame,
-                canonical_by_sample.get(int(frame["sample_index"]), []),
+                sample_observations,
                 approved_samples,
+                source_adjudication_mode=source_mode,
+                eligible_count=sum(
+                    bool(item.get("tactical_eligible")) for item in sample_observations
+                ),
             )
-            warning_text = f" warnings={'; '.join(warnings)}" if warnings else ""
             macro_counts: Counter[str] = Counter()
+            current_zone_names: set[str] = set()
             for obs in canonical_by_sample.get(frame["sample_index"], []):
                 if obs.get("canonical_x") is None or obs.get("canonical_y") is None:
                     continue
                 x, y = float(obs["canonical_x"]), float(obs["canonical_y"])
                 p = (round(x), round(y))
                 confidence = float(obs.get("confidence", 1.0))
-                _zone_id, macro = assign_zone(x, y, map_data)
-                macro_counts[macro] += 1
-                cv2.circle(map_image, p, 8, (0, 255, 255), 2)
+                zone_id, macro = assign_zone(x, y, map_data)
+                eligible = bool(obs.get("tactical_eligible", True))
+                if eligible:
+                    macro_counts[macro] += 1
+                if eligible and zone_id != "unknown":
+                    current_zone_names.add(
+                        next(
+                            (
+                                str(zone.get("name", zone["zone_id"]))
+                                for zone in map_data["zones"]
+                                if zone["zone_id"] == zone_id
+                            ),
+                            zone_id,
+                        )
+                    )
+                marker_color = (0, 255, 0) if eligible else (0, 165, 255)
+                cv2.circle(map_image, p, 8, marker_color, 2)
                 source_point = np.linalg.solve(matrix[:, :2], np.array([x, y]) - matrix[:, 2])
                 minimap_point = (round(float(source_point[0])), round(float(source_point[1])))
-                cv2.circle(minimap, minimap_point, 7, (0, 255, 0), 2)
-                cv2.putText(
-                    minimap,
-                    f"{confidence:.2f}",
-                    minimap_point,
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.32,
-                    (255, 255, 255),
-                    1,
+                point_is_in_minimap = (
+                    0 <= minimap_point[0] < minimap.shape[1]
+                    and 0 <= minimap_point[1] < minimap.shape[0]
                 )
+                if point_is_in_minimap:
+                    cv2.circle(minimap, minimap_point, 7, marker_color, 2)
+                    cv2.putText(
+                        minimap,
+                        f"{confidence:.2f}",
+                        minimap_point,
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.32,
+                        (255, 255, 255),
+                        1,
+                    )
             sample_observations = canonical_by_sample.get(int(frame["sample_index"]), [])
             source_state = (
                 "CORRECTED"
@@ -357,19 +692,24 @@ def _write_playbacks(
                 if int(frame["sample_index"]) in approved_samples
                 else "RAW"
             )
-            minimap_caption = (
-                f"{config.team.short_name} {config.team.side} {round_id} "
-                f"{timestamp:.2f}s {source_state} coverage={status}{warning_text}"
+            eligible_count = sum(
+                bool(item.get("tactical_eligible", True)) for item in sample_observations
             )
-            cv2.putText(
-                minimap,
-                minimap_caption,
-                (4, 14),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.4,
-                (255, 255, 255),
-                1,
+            candidate_count = sum(
+                item.get("canonical_x") is not None and item.get("canonical_y") is not None
+                for item in sample_observations
             )
+            eligibility_label = "eligible evidence" if source_mode else "candidate markers"
+            playback_caption = [
+                f"team: {config.team.short_name} | side: {config.team.side}",
+                f"round: {round_id}",
+                f"source: {timestamp:.2f}s | state: {source_state} | coverage: {status}",
+                f"markers: eligible={eligible_count} candidates={candidate_count}",
+                f"zones: {', '.join(sorted(current_zone_names)) or 'none'}",
+                f"legend: green={eligibility_label}; orange=deferred/unreviewed candidate",
+            ]
+            playback_caption.extend(f"warning: {warning}" for warning in warnings)
+            minimap_frame = _caption_frame(minimap, playback_caption, scale=0.31)
             phase_annotations = []
             if (
                 summary
@@ -389,31 +729,12 @@ def _write_playbacks(
             macro_text = "A={} MID={} B={}".format(
                 macro_counts["A"], macro_counts["MID"], macro_counts["B"]
             )
-            canonical_caption = (
-                f"{config.team.short_name} {config.team.side} | {timestamp:.2f}s | "
-                f"{macro_text} | {source_state} coverage={status}{warning_text}"
+            canonical_caption = playback_caption + [f"macro counts: {macro_text}"]
+            map_frame = _caption_frame(
+                map_image, canonical_caption, scale=0.45, phase_lines=phase_annotations
             )
-            cv2.putText(
-                map_image,
-                canonical_caption,
-                (20, 30),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                (255, 255, 255),
-                2,
-            )
-            for index, annotation in enumerate(phase_annotations):
-                cv2.putText(
-                    map_image,
-                    annotation,
-                    (20, 60 + index * 25),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    (0, 255, 255),
-                    2,
-                )
-            mini_writer.write(minimap)
-            map_writer.write(map_image)
+            mini_writer.write(minimap_frame)
+            map_writer.write(map_frame)
     finally:
         cap.release()
         mini_writer.release()
@@ -427,13 +748,6 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
     raw_path = round_dir / "raw_observations.jsonl"
     if not raw_path.is_file():
         raise ValueError(f"raw observations are missing for {round_id}")
-    revision_root = round_dir / "derived"
-    revision_root.mkdir(exist_ok=True)
-    numbers = [int(item.name.split("-")[-1]) for item in revision_root.glob("revision-*")]
-    revision = max(numbers, default=0) + 1
-    final_output = revision_root / f"revision-{revision:03d}"
-    output = revision_root / f".revision-{revision:03d}-{uuid.uuid4().hex}.tmp"
-    output.mkdir()
     raw_snapshot = raw_path.read_bytes()
     corrections_path = round_dir / "corrections.jsonl"
     corrections_snapshot = corrections_path.read_bytes() if corrections_path.exists() else b""
@@ -442,6 +756,30 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
     raw_history = _parse_jsonl(raw_snapshot, raw_path)
     correction_history = _parse_jsonl(corrections_snapshot, corrections_path)
     review_history = _parse_jsonl(reviews_snapshot, reviews_path)
+    mode_path = run_dir / "source_adjudication_mode.json"
+    mode_snapshot = mode_path.read_bytes() if mode_path.exists() else b""
+    source_mode_manifest = (
+        SourceAdjudicationMode.model_validate_json(mode_snapshot)
+        if mode_snapshot
+        else SourceAdjudicationMode(run_id=config.run.run_id)
+    )
+    if source_mode_manifest.run_id != config.run.run_id:
+        raise ValueError("source-adjudication mode run_id does not match run configuration")
+    configured_round_ids = {item.round_id for item in config.rounds}
+    if not set(source_mode_manifest.round_ids) <= configured_round_ids:
+        raise ValueError("source-adjudication mode contains an unknown round")
+    source_mode_required = round_id in source_mode_manifest.round_ids
+    adjudications_path = round_dir / "marker_adjudications.jsonl"
+    adjudication_sidecar_exists = adjudications_path.exists()
+    if source_mode_required and not adjudication_sidecar_exists:
+        raise ValueError("source-adjudicated round is missing its adjudication sidecar")
+    adjudications_snapshot = (
+        adjudications_path.read_bytes() if adjudication_sidecar_exists else b""
+    )
+    adjudication_history = _parse_jsonl(adjudications_snapshot, adjudications_path)
+    coverage_path = round_dir / "sample_coverage.jsonl"
+    coverage_snapshot = coverage_path.read_bytes()
+    coverage_history = _parse_jsonl(coverage_snapshot, coverage_path)
     corrected_samples = {int(row["sample_index"]) for row in correction_history}
     rows, approved_samples = corrected_rows(
         round_dir,
@@ -450,8 +788,17 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
         correction_history=correction_history,
         review_history=review_history,
         raw_history=raw_history,
+        adjudication_history=adjudication_history if adjudication_sidecar_exists else None,
+        coverage_history=coverage_history,
     )
-    coverage = _read_jsonl(round_dir / "sample_coverage.jsonl")
+    revision_root = round_dir / "derived"
+    revision_root.mkdir(exist_ok=True)
+    numbers = [int(item.name.split("-")[-1]) for item in revision_root.glob("revision-*")]
+    revision = max(numbers, default=0) + 1
+    final_output = revision_root / f"revision-{revision:03d}"
+    output = revision_root / f".revision-{revision:03d}-{uuid.uuid4().hex}.tmp"
+    output.mkdir()
+    coverage = coverage_history
     _, _, map_data, asset, _ = load_assets(config)
     by_sample: dict[int, list[dict]] = {}
     for row in rows:
@@ -464,7 +811,17 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
     occupancy: list[dict[str, Any]] = []
     for frame in coverage:
         sample = int(frame["sample_index"])
-        observations = grouped.get(sample, [])
+        candidate_observations = grouped.get(sample, [])
+        round_source_mode = adjudication_sidecar_exists or source_mode_required
+        observations = [
+            item
+            for item in candidate_observations
+            if item.get("tactical_eligible", True)
+            and (
+                not round_source_mode
+                or _valid_canonical_position(item, config)
+            )
+        ]
         zone_counts: Counter[str] = Counter()
         macro_counts: Counter[str] = Counter()
         points: list[tuple[float, float]] = []
@@ -486,7 +843,13 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
             if points
             else None
         )
-        status, warnings = _effective_coverage(frame, observations, approved_samples)
+        status, warnings = _effective_coverage(
+            frame,
+            candidate_observations,
+            approved_samples,
+            source_adjudication_mode=round_source_mode,
+            eligible_count=len(observations),
+        )
         occupancy.append(
             {
                 "run_id": config.run.run_id,
@@ -494,6 +857,22 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
                 "sample_index": sample,
                 "source_timestamp_seconds": frame["source_timestamp_seconds"],
                 "observed_marker_count": len(observations),
+                "candidate_observed_marker_count": len(candidate_observations),
+                "source_adjudication_mode": round_source_mode,
+                "tactical_eligible_observation_ids": [
+                    item["observation_id"] for item in observations
+                ],
+                "source_supported_observation_ids": [
+                    item["observation_id"]
+                    for item in observations
+                    if item.get("adjudication_disposition") == "supported"
+                ],
+                "whole_frame_approved": sample in approved_samples,
+                "adjudication_evidence": [
+                    item["adjudication_evidence"]
+                    for item in observations
+                    if item.get("adjudication_evidence")
+                ],
                 "zone_counts": {
                     zone_id: zone_counts[zone_id]
                     for zone_id in [zone["zone_id"] for zone in map_data["zones"]] + ["unknown"]
@@ -513,6 +892,8 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
     with corrected_path.open("w", encoding="utf-8") as stream:
         for row in sorted(rows, key=lambda x: (x["sample_index"], x["observation_id"])):
             stream.write(json.dumps(row, separators=(",", ":"), allow_nan=False) + "\n")
+    (output / "marker_adjudications.jsonl").write_bytes(adjudications_snapshot)
+    (output / "source_adjudication_mode.json").write_bytes(mode_snapshot)
     csv_path = output / "occupancy.csv"
     with csv_path.open("w", newline="", encoding="utf-8") as stream:
         writer = csv.DictWriter(
@@ -560,19 +941,27 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
         approved_samples,
         corrected_samples,
         summary,
+        adjudication_sidecar_exists or source_mode_required,
     )
     manifest = {
         "revision": revision,
         "round_id": round_id,
         "raw_observations_sha256": hashlib.sha256(raw_snapshot).hexdigest(),
+        "sample_coverage_sha256": hashlib.sha256(coverage_snapshot).hexdigest(),
         "corrections_sha256": hashlib.sha256(corrections_snapshot).hexdigest(),
         "reviewed_frames_sha256": hashlib.sha256(reviews_snapshot).hexdigest(),
+        "marker_adjudications_sha256": hashlib.sha256(adjudications_snapshot).hexdigest(),
+        "source_adjudication_mode_sha256": hashlib.sha256(mode_snapshot).hexdigest(),
+        "source_adjudication_mode": adjudication_sidecar_exists or source_mode_required,
+        "adjudication_count": len(adjudication_history),
         "correction_count": len(correction_history),
         "reviewed_frame_count": len({int(row["sample_index"]) for row in review_history}),
         "frame_count": len(occupancy),
         "detector_invoked": False,
         "artifacts": [
             "corrected_observations.jsonl",
+            "marker_adjudications.jsonl",
+            "source_adjudication_mode.json",
             "occupancy.csv",
             "occupancy.parquet",
             "corrected_minimap.mp4",

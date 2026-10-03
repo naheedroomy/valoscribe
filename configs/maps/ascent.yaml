@@ -383,6 +383,10 @@
     "A": ["a_main", "a_site"],
     "B": ["b_main", "b_site"]
   },
+  "commitment_continuation_zones": {
+    "A": ["a_defensive_back_site"],
+    "B": ["b_defensive_back_site"]
+  },
   "unknown_zone": {
     "zone_id": "unknown",
     "name": "Unknown / outside configured polygons",

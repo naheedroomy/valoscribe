@@ -11,7 +11,7 @@ import pytest
 from typer.testing import CliRunner
 
 import valoscribe.tactical.cli as cli_module
-from valoscribe.tactical.config import load_config
+from valoscribe.tactical.config import ExcludedInterval, load_config, load_map_config
 from valoscribe.tactical.contracts import RoundMovementSummary
 from valoscribe.tactical.pipeline import analyze_config
 from valoscribe.tactical.reporting import (
@@ -94,7 +94,7 @@ def test_opening_and_sustained_shift_commitment_are_evidence_linked_candidates()
     assert summary.commitment_evidence["sample"]["coverage_status"] == "partial"
 
 
-def test_opening_window_counts_usable_samples_across_unknown_coverage() -> None:
+def test_unknown_live_samples_consume_bounded_opening_budget() -> None:
     config, round_config, map_data = _setup()
     rows = _samples(config, round_config)
     for row in rows[:8]:
@@ -107,9 +107,79 @@ def test_opening_window_counts_usable_samples_across_unknown_coverage() -> None:
         report_root=Path("."),
         map_data=map_data,
     )
-    assert summary.opening_observed_samples == 32
-    assert summary.opening_sample_denominator == 40
+    assert summary.opening_observed_samples == 24
+    assert summary.opening_sample_denominator == 32
     assert summary.opening_completeness == "unknown"
+
+
+def test_late_evidence_after_long_unknown_gap_is_not_opening_evidence() -> None:
+    config, original_round, map_data = _setup()
+    round_config = original_round.model_copy(
+        update={"source_start_seconds": 790.0, "source_end_seconds": 870.0}
+    )
+    rows = [
+        {
+            "sample_index": 0,
+            "source_timestamp_seconds": 790.0,
+            "coverage_status": "unknown",
+            "observed_marker_count": 0,
+            "macro_counts": {},
+        },
+        {
+            "sample_index": 296,
+            "source_timestamp_seconds": 864.0,
+            "coverage_status": "partial",
+            "observed_marker_count": 4,
+            "macro_counts": {"A": 4, "MID": 0, "B": 0},
+        },
+    ]
+    summary = build_round_summary(
+        round_config.round_id,
+        round_config,
+        config,
+        rows,
+        report_root=Path("."),
+        map_data=map_data,
+    )
+    assert summary.opening_distribution is None
+    assert summary.opening_sample_denominator == 1
+    assert summary.opening_evidence["samples"] == []
+
+
+def test_configured_excluded_start_defers_opening_window_by_gap_duration() -> None:
+    config, original_round, map_data = _setup()
+    start = original_round.source_start_seconds
+    round_config = original_round.model_copy(
+        update={
+            "excluded_intervals": [
+                ExcludedInterval(
+                    start_seconds=start,
+                    end_seconds=start + 2,
+                    reason="explicit replay exclusion",
+                )
+            ]
+        }
+    )
+    rows = _samples(config, round_config)
+    for row in rows:
+        offset = row["source_timestamp_seconds"] - start
+        if offset < 2:
+            row["coverage_status"] = "excluded"
+        elif offset >= 10:
+            row["coverage_status"] = "unknown"
+    summary = build_round_summary(
+        round_config.round_id,
+        round_config,
+        config,
+        rows,
+        report_root=Path("."),
+        map_data=map_data,
+    )
+    assert summary.opening_sample_denominator == 40
+    assert summary.opening_observed_samples == 32
+    assert summary.opening_evidence["samples"][-1]["timestamp_seconds"] == pytest.approx(
+        start + 9.75
+    )
 
 
 def test_opposite_presence_requires_positive_evidence_or_strong_coverage() -> None:
@@ -236,6 +306,146 @@ def test_non_aligned_commitment_guard_includes_first_sample_after_endpoint() -> 
     assert guard_end == pytest.approx(expected_endpoint + 0.15)
 
 
+def test_back_site_continuation_passes_guard_but_cannot_initiate_commitment() -> None:
+    config, round_config, map_data = _setup()
+    map_data["commitment_continuation_zones"] = {
+        "A": ["a_defensive_back_site"],
+        "B": ["b_defensive_back_site"],
+    }
+    rows = _samples(config, round_config)
+    for row in rows:
+        offset = row["source_timestamp_seconds"] - round_config.source_start_seconds
+        if 9.0 <= offset < 11.25:
+            row["zone_counts"] = {
+                "a_main": 2,
+                "a_site": 1,
+                "a_defensive_back_site": 0,
+                "b_main": 0,
+                "b_site": 0,
+                "b_defensive_back_site": 0,
+            }
+        elif offset >= 11.25:
+            row["zone_counts"] = {
+                "a_main": 0,
+                "a_site": 2,
+                "a_defensive_back_site": 1,
+                "b_main": 0,
+                "b_site": 0,
+                "b_defensive_back_site": 0,
+            }
+    summary = build_round_summary(
+        round_config.round_id, round_config, config, rows, report_root=Path("."), map_data=map_data
+    )
+    assert summary.apparent_commitment_site == "A"
+    assert summary.commitment_evidence["reversal_check_window"]["end_timestamp_seconds"] >= (
+        summary.commitment_evidence["persistence_window"]["end_timestamp_seconds"]
+        + config.run.commitment_reversal_guard_seconds
+    )
+    assert (
+        summary.rule_configuration["commitment_continuation_zones"]
+        == map_data["commitment_continuation_zones"]
+    )
+    legacy_map_data = {
+        key: value for key, value in map_data.items() if key != "commitment_continuation_zones"
+    }
+    legacy = build_round_summary(
+        round_config.round_id,
+        round_config,
+        config,
+        rows,
+        report_root=Path("."),
+        map_data=legacy_map_data,
+    )
+    assert legacy.apparent_commitment_site is None
+
+    # Without an initiation-zone observation, continuation zones cannot start the event.
+    for row in rows:
+        if row["source_timestamp_seconds"] >= round_config.source_start_seconds + 9.0:
+            row["zone_counts"] = {
+                "a_main": 0,
+                "a_site": 0,
+                "a_defensive_back_site": 3,
+                "b_main": 0,
+                "b_site": 0,
+                "b_defensive_back_site": 0,
+            }
+    no_initiation = build_round_summary(
+        round_config.round_id, round_config, config, rows, report_root=Path("."), map_data=map_data
+    )
+    assert no_initiation.apparent_commitment_site is None
+
+
+def test_back_site_guard_still_requires_three_same_site_eligible_observations() -> None:
+    config, round_config, map_data = _setup()
+    map_data["commitment_continuation_zones"] = {"A": ["a_defensive_back_site"]}
+    rows = _samples(config, round_config)
+    for row in rows:
+        offset = row["source_timestamp_seconds"] - round_config.source_start_seconds
+        if offset >= 9.0:
+            row["zone_counts"] = {
+                "a_main": 0 if offset >= 11.25 else 3,
+                "a_site": 0,
+                "a_defensive_back_site": 2 if offset >= 11.25 else 0,
+                "b_main": 0,
+                "b_site": 0,
+            }
+            row["observed_marker_count"] = 3
+    summary = build_round_summary(
+        round_config.round_id, round_config, config, rows, report_root=Path("."), map_data=map_data
+    )
+    assert summary.apparent_commitment_site is None
+
+
+@pytest.mark.parametrize(
+    "guard_counts,unknown_at",
+    [
+        ({"a_site": 2, "a_lobby": 1}, None),
+        ({"a_site": 2, "unknown": 1}, None),
+        ({"a_site": 2, "b_site": 1}, None),
+        ({"a_site": 2, "a_defensive_back_site": 1}, 11.5),
+    ],
+)
+def test_continuation_does_not_accept_lobby_unmapped_opposite_or_gap(
+    guard_counts, unknown_at
+) -> None:
+    config, round_config, map_data = _setup()
+    map_data["commitment_continuation_zones"] = {
+        "A": ["a_defensive_back_site"],
+        "B": ["b_defensive_back_site"],
+    }
+    rows = _samples(config, round_config)
+    for row in rows:
+        offset = row["source_timestamp_seconds"] - round_config.source_start_seconds
+        if 9.0 <= offset < 11.25:
+            row["zone_counts"] = {
+                "a_main": 3,
+                "a_site": 0,
+                "a_defensive_back_site": 0,
+                "a_lobby": 0,
+                "b_main": 0,
+                "b_site": 0,
+                "b_defensive_back_site": 0,
+                "unknown": 0,
+            }
+        elif offset >= 11.25:
+            row["zone_counts"] = {
+                "a_main": 0,
+                "a_site": guard_counts.get("a_site", 0),
+                "a_defensive_back_site": guard_counts.get("a_defensive_back_site", 0),
+                "a_lobby": guard_counts.get("a_lobby", 0),
+                "b_main": 0,
+                "b_site": guard_counts.get("b_site", 0),
+                "b_defensive_back_site": 0,
+                "unknown": guard_counts.get("unknown", 0),
+            }
+        if unknown_at is not None and offset == unknown_at:
+            row["coverage_status"] = "unknown"
+    summary = build_round_summary(
+        round_config.round_id, round_config, config, rows, report_root=Path("."), map_data=map_data
+    )
+    assert summary.apparent_commitment_site is None
+
+
 def test_zero_second_commitment_guard_is_explicitly_disabled() -> None:
     config, round_config, map_data = _setup()
     config = config.model_copy(
@@ -255,6 +465,30 @@ def test_zero_second_commitment_guard_is_explicitly_disabled() -> None:
         "duration_seconds": 0.0,
         "sample_indices": [],
     }
+
+
+def test_map_continuation_zone_validation_rejects_unknown_wrong_macro_and_bad_shape(
+    tmp_path,
+) -> None:
+    source = json.loads((ROOT / "configs/maps/ascent.yaml").read_text(encoding="utf-8"))
+    for continuation, expected_error in (
+        ({"A": ["missing_zone"]}, "unknown zone"),
+        ({"A": ["b_site"]}, "must belong to macro A"),
+        ({"A": "a_defensive_back_site"}, "must map A/B to zone ID lists"),
+    ):
+        candidate = {**source, "commitment_continuation_zones": continuation}
+        path = tmp_path / "map.json"
+        path.write_text(json.dumps(candidate), encoding="utf-8")
+        with pytest.raises(ValueError, match=expected_error):
+            load_map_config(path)
+
+
+def test_map_without_continuation_zones_keeps_legacy_guard_semantics(tmp_path) -> None:
+    source = json.loads((ROOT / "configs/maps/ascent.yaml").read_text(encoding="utf-8"))
+    source.pop("commitment_continuation_zones", None)
+    path = tmp_path / "map.json"
+    path.write_text(json.dumps(source), encoding="utf-8")
+    assert load_map_config(path).get("commitment_continuation_zones", {}) == {}
 
 
 def test_shift_requires_stable_adjacent_baseline_and_candidate_onset_persistence() -> None:

@@ -5,12 +5,13 @@ from __future__ import annotations
 import json
 import uuid
 from pathlib import Path
+from typing import Literal
 
 import typer
 
 from valoscribe.tactical.config import load_config
-from valoscribe.tactical.contracts import RoundMovementSummary
-from valoscribe.tactical.corrections import rebuild_round
+from valoscribe.tactical.contracts import MarkerAdjudication, RoundMovementSummary
+from valoscribe.tactical.corrections import append_adjudications, rebuild_round
 from valoscribe.tactical.pipeline import analyze_config, inspect_config
 from valoscribe.tactical.reporting import write_aggregate_report
 from valoscribe.tactical.review import review_round
@@ -43,6 +44,58 @@ def review_command(
         review_round(run_dir, round_id, config, reviewer)
     except (OSError, ValueError) as error:
         raise typer.BadParameter(str(error)) from error
+
+
+@app.command("enable-source-adjudication")
+def enable_source_adjudication_command(
+    run_dir: Path = typer.Option(..., "--run-dir", exists=True, file_okay=False),
+    round_id: str = typer.Option(..., "--round-id"),
+) -> None:
+    """Opt a round into fail-closed source adjudication before adding markers."""
+    try:
+        config, _ = load_config(run_dir / "config.snapshot.yaml")
+        append_adjudications(run_dir / "rounds" / round_id, [], config, round_id)
+    except (OSError, ValueError) as error:
+        raise typer.BadParameter(str(error)) from error
+    typer.echo(f"Source adjudication enabled for {round_id}")
+
+
+@app.command("adjudicate-marker")
+def adjudicate_marker_command(
+    run_dir: Path = typer.Option(..., "--run-dir", exists=True, file_okay=False),
+    round_id: str = typer.Option(..., "--round-id"),
+    sample_index: int = typer.Option(..., "--sample-index", min=0),
+    observation_id: str = typer.Option(..., "--observation-id"),
+    disposition: Literal["supported", "deferred"] = typer.Option(..., "--disposition"),
+    reviewer: str = typer.Option(..., "--reviewer"),
+    source_locator: str = typer.Option(..., "--source-locator"),
+    source_timestamp_seconds: float = typer.Option(..., "--source-timestamp-seconds", min=0),
+    source_frame_index: int | None = typer.Option(None, "--source-frame-index", min=0),
+    confidence: float = typer.Option(..., "--confidence", min=0, max=1),
+    note: str | None = typer.Option(None, "--note"),
+    adjudication_id: str | None = typer.Option(None, "--adjudication-id"),
+) -> None:
+    """Append source-supported/deferred evidence for one stable marker id."""
+    try:
+        config, _ = load_config(run_dir / "config.snapshot.yaml")
+        item = MarkerAdjudication(
+            adjudication_id=adjudication_id or uuid.uuid4().hex,
+            run_id=config.run.run_id,
+            round_id=round_id,
+            sample_index=sample_index,
+            target_observation_id=observation_id,
+            disposition=disposition,
+            reviewer=reviewer,
+            source_locator=source_locator,
+            source_timestamp_seconds=source_timestamp_seconds,
+            source_frame_index=source_frame_index,
+            confidence=confidence,
+            note=note,
+        )
+        append_adjudications(run_dir / "rounds" / round_id, [item], config, round_id)
+    except (OSError, ValueError) as error:
+        raise typer.BadParameter(str(error)) from error
+    typer.echo(item.model_dump_json())
 
 
 @app.command("rebuild")

@@ -74,6 +74,36 @@ class ReviewedFrame(Contract):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class SourceAdjudicationMode(Contract):
+    """Persistent run-level opt-in that makes missing round sidecars fail closed."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal[1] = 1
+    run_id: str
+    round_ids: tuple[str, ...] = ()
+
+
+class MarkerAdjudication(Contract):
+    """Append-only source evidence for one effective marker, not a frame approval."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    adjudication_id: str = Field(min_length=1)
+    run_id: str
+    round_id: str
+    sample_index: int = Field(ge=0)
+    target_observation_id: str = Field(min_length=1)
+    disposition: Literal["supported", "deferred"]
+    reviewer: str = Field(min_length=1)
+    source_locator: str = Field(min_length=1)
+    source_timestamp_seconds: float = Field(ge=0)
+    source_frame_index: int | None = Field(default=None, ge=0)
+    confidence: float = Field(ge=0, le=1)
+    note: str | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class RoundMovementSummary(Contract):
     run_id: str
     round_id: str
