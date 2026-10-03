@@ -39,6 +39,40 @@ class TeamFrameState(Contract):
     warning: str | None = None
 
 
+class CorrectionDelta(Contract):
+    """One immutable add/remove/move record against a stable marker identifier."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    correction_id: str
+    run_id: str
+    round_id: str
+    sample_index: int = Field(ge=0)
+    operation: Literal["add", "remove", "move"]
+    target_observation_id: str | None = None
+    original_canonical_x: float | None = None
+    original_canonical_y: float | None = None
+    corrected_canonical_x: float | None = None
+    corrected_canonical_y: float | None = None
+    confidence: float = Field(default=1.0, ge=0, le=1)
+    reviewer: str = Field(min_length=1)
+    note: str | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ReviewedFrame(Contract):
+    """Explicit evidence that a sampled frame was inspected, even with no edits."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    run_id: str
+    round_id: str
+    sample_index: int = Field(ge=0)
+    reviewer: str = Field(min_length=1)
+    note: str | None = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
 class RunManifest(Contract):
     schema_version: Literal[1] = 1
     run_id: str

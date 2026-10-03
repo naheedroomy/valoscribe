@@ -9,7 +9,15 @@ import cv2
 import numpy as np
 import pytest
 
+from valoscribe.tactical.cli import app as tactical_app
 from valoscribe.tactical.config import load_config
+from valoscribe.tactical.contracts import CorrectionDelta, ReviewedFrame
+from valoscribe.tactical.corrections import (
+    corrected_rows,
+    observation_id,
+    rebuild_round,
+    validate_delta,
+)
 from valoscribe.tactical.detection import crop_map_mask, detect_markers
 from valoscribe.tactical.pipeline import (
     _crop,
@@ -17,6 +25,7 @@ from valoscribe.tactical.pipeline import (
     assign_zone,
     create_run_directory,
 )
+from valoscribe.tactical.review import ReviewController
 
 ROOT = Path(__file__).parents[1]
 
@@ -166,6 +175,190 @@ def test_config_rejects_invalid_crop_or_hsv() -> None:
     payload["broadcast"]["color_ranges_hsv_candidate_only"][0]["upper"] = [10, 0, 0]
     with pytest.raises(ValueError, match="HSV lower bounds"):
         load_config_data(payload)
+
+
+def test_correction_add_remove_move_and_reject_mismatched_targets(tmp_path: Path) -> None:
+    config, _ = load_config(ROOT / "configs/examples/ascent-team-movement.example.yaml")
+    config = config.model_copy(update={"run": config.run.model_copy(update={"run_id": "fixture"})})
+    raw = [
+        {
+            "round_id": "map3-round4",
+            "sample_index": 0,
+            "canonical_x": 100.0,
+            "canonical_y": 200.0,
+            "source_timestamp_seconds": 5.0,
+        }
+    ]
+    target = observation_id("map3-round4", 0, 0)
+    move = CorrectionDelta(
+        correction_id="move-1",
+        run_id="fixture",
+        round_id="map3-round4",
+        sample_index=0,
+        operation="move",
+        target_observation_id=target,
+        original_canonical_x=100,
+        original_canonical_y=200,
+        corrected_canonical_x=120,
+        corrected_canonical_y=220,
+        reviewer="test",
+    )
+    validate_delta(move, raw, config)
+    delta_path = tmp_path / "round" / "corrections.jsonl"
+    delta_path.parent.mkdir()
+    delta_path.write_text(move.model_dump_json() + "\n")
+    raw_path = delta_path.parent / "raw_observations.jsonl"
+    raw_path.write_text(json.dumps(raw[0]) + "\n")
+    (delta_path.parent / "sample_coverage.jsonl").write_text(
+        json.dumps(
+            {
+                "sample_index": 0,
+                "source_timestamp_seconds": 5.0,
+            }
+        )
+        + "\n"
+    )
+    corrected, _ = corrected_rows(delta_path.parent, "map3-round4", config)
+    assert len(corrected) == 1
+    assert corrected[0]["canonical_x"] == 120
+    with pytest.raises(ValueError, match="original position"):
+        validate_delta(move.model_copy(update={"original_canonical_x": 101}), raw, config)
+    add = move.model_copy(
+        update={
+            "operation": "add",
+            "target_observation_id": None,
+            "original_canonical_x": None,
+            "original_canonical_y": None,
+        }
+    )
+    validate_delta(add, raw, config)
+    remove = move.model_copy(
+        update={
+            "operation": "remove",
+            "corrected_canonical_x": None,
+            "corrected_canonical_y": None,
+        }
+    )
+    validate_delta(remove, raw, config)
+    assert raw_path.read_text() == json.dumps(raw[0]) + "\n"
+
+
+def test_add_correction_is_supported_for_a_sample_with_zero_raw_candidates(tmp_path: Path) -> None:
+    config, _ = load_config(ROOT / "configs/examples/ascent-team-movement.example.yaml")
+    config = config.model_copy(update={"run": config.run.model_copy(update={"run_id": "fixture"})})
+    round_dir = tmp_path / "round"
+    round_dir.mkdir()
+    (round_dir / "raw_observations.jsonl").write_text("")
+    (round_dir / "sample_coverage.jsonl").write_text(
+        json.dumps(
+            {
+                "sample_index": 3,
+                "source_timestamp_seconds": 10.75,
+            }
+        )
+        + "\n"
+    )
+    delta = CorrectionDelta(
+        correction_id="added",
+        run_id="fixture",
+        round_id="map3-round4",
+        sample_index=3,
+        operation="add",
+        corrected_canonical_x=200,
+        corrected_canonical_y=300,
+        reviewer="test",
+    )
+    (round_dir / "corrections.jsonl").write_text(delta.model_dump_json() + "\n")
+    corrected, _ = corrected_rows(round_dir, "map3-round4", config)
+    assert len(corrected) == 1
+    assert corrected[0]["source_timestamp_seconds"] == 10.75
+
+
+def test_review_and_rebuild_commands_are_exposed() -> None:
+    from typer.testing import CliRunner
+
+    runner = CliRunner()
+    assert runner.invoke(tactical_app, ["review", "--help"]).exit_code == 0
+    assert runner.invoke(tactical_app, ["rebuild", "--help"]).exit_code == 0
+
+
+def test_review_controller_handles_navigation_selection_staging_and_save_state() -> None:
+    controller = ReviewController([4, 9])
+    controller.select("observation")
+    controller.stage({"operation": "add"})
+    assert controller.dirty and controller.sample_index == 4
+    controller.move(1)
+    assert controller.sample_index == 9 and controller.selected_id is None
+    controller.saved()
+    assert not controller.dirty and controller.staged == []
+
+
+def test_rebuild_generates_corrected_occupancy_without_detection(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import valoscribe.tactical.detection as detector
+
+    config, raw_config = load_config(ROOT / "configs/examples/ascent-team-movement.example.yaml")
+    source = tmp_path / "source.mp4"
+    writer = cv2.VideoWriter(str(source), cv2.VideoWriter.fourcc(*"mp4v"), 30.0, (1920, 1080))
+    assert writer.isOpened()
+    writer.write(np.zeros((1080, 1920, 3), dtype=np.uint8))
+    writer.release()
+    config = config.model_copy(
+        update={
+            "run": config.run.model_copy(update={"run_id": "fixture"}),
+            "source": config.source.model_copy(update={"video_path": source}),
+            "rounds": [config.rounds[0].model_copy(update={"round_id": "map3-round4"})],
+        }
+    )
+    run_dir = tmp_path / "run"
+    round_dir = run_dir / "rounds" / "map3-round4"
+    round_dir.mkdir(parents=True)
+    (run_dir / "config.snapshot.yaml").write_bytes(raw_config)
+    raw_row = {
+        "run_id": "fixture",
+        "round_id": "map3-round4",
+        "sample_index": 0,
+        "source_timestamp_seconds": 0.0,
+        "canonical_x": 1100.0,
+        "canonical_y": 800.0,
+        "crop_x": 1.0,
+        "crop_y": 1.0,
+        "confidence": 0.7,
+    }
+    raw_path = round_dir / "raw_observations.jsonl"
+    raw_path.write_text(json.dumps(raw_row) + "\n")
+    (round_dir / "sample_coverage.jsonl").write_text(
+        json.dumps(
+            {
+                "sample_index": 0,
+                "source_timestamp_seconds": 0.0,
+                "coverage_status": "partial",
+                "observed_marker_count": 1,
+                "warning": "unreviewed",
+            }
+        )
+        + "\n"
+    )
+    (round_dir / "reviewed_frames.jsonl").write_text(
+        ReviewedFrame(
+            run_id="fixture", round_id="map3-round4", sample_index=0, reviewer="reviewer"
+        ).model_dump_json()
+        + "\n"
+    )
+    monkeypatch.setattr(detector, "detect_markers", lambda *args: pytest.fail("detector invoked"))
+    first = rebuild_round(run_dir, "map3-round4", config)
+    second = rebuild_round(run_dir, "map3-round4", config)
+    assert first["detector_invoked"] is False
+    assert first["revision_directory"] != second["revision_directory"]
+    revision = Path(first["revision_directory"])
+    assert (revision / "corrected_observations.jsonl").is_file()
+    assert (revision / "occupancy.csv").is_file()
+    assert (revision / "occupancy.parquet").stat().st_size > 0
+    assert (revision / "corrected_minimap.mp4").stat().st_size > 0
+    assert (revision / "corrected_canonical.mp4").stat().st_size > 0
+    assert json.loads((revision / "revision.json").read_text())["reviewed_frame_count"] == 1
+    assert raw_path.read_text() == json.dumps(raw_row) + "\n"
 
 
 def load_config_data(payload: dict) -> None:
