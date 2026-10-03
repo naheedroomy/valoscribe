@@ -320,6 +320,18 @@ def test_review_controller_blocks_navigation_until_staged_edits_are_saved_or_dis
             [(20, 20), (10, 10), None, None],
             False,
         ),
+        (
+            "add-discard-approve-save",
+            [ord("x"), ord("v"), ord("s"), ord("q")],
+            [(20, 20), None, None, None],
+            False,
+        ),
+        (
+            "remove-discard-edit-approve-save",
+            [127, ord("x"), 127, ord("v"), ord("s"), ord("q")],
+            [(10, 10), None, (10, 10), None, None, None],
+            True,
+        ),
     ],
 )
 def test_review_round_preserves_frame_binding_and_staged_marker_ids(
@@ -341,6 +353,7 @@ def test_review_round_preserves_frame_binding_and_staged_marker_ids(
             "sample_index": 0,
             "canonical_x": 100.0,
             "canonical_y": 100.0,
+            "source_timestamp_seconds": 0.0,
             "confidence": 0.8,
         },
     ) if has_raw else ()
@@ -421,8 +434,28 @@ def test_review_round_preserves_frame_binding_and_staged_marker_ids(
     elif scenario == "add-save-remove-save":
         assert [item["operation"] for item in persisted] == ["add", "remove"]
         assert persisted[1]["target_observation_id"] == persisted[0]["correction_id"]
-    else:
+    elif scenario != "remove-discard-edit-approve-save":
         assert persisted == []
+    if scenario == "remove-discard-edit-approve-save":
+        assert [item["operation"] for item in persisted] == ["remove"]
+        assert persisted[0]["target_observation_id"] == f"{round_id}:0:0"
+        reviewed = [
+            json.loads(line)
+            for line in (round_dir / "reviewed_frames.jsonl").read_text().splitlines()
+        ]
+        assert reviewed[-1]["approved"] is True
+        corrected, approved = corrected_rows(round_dir, round_id, config)
+        assert approved == {0}
+        assert corrected == []
+    if scenario == "add-discard-approve-save":
+        reviewed = [
+            json.loads(line)
+            for line in (round_dir / "reviewed_frames.jsonl").read_text().splitlines()
+        ]
+        assert reviewed[-1]["approved"] is True
+        corrected, approved = corrected_rows(round_dir, round_id, config)
+        assert approved == {0}
+        assert corrected == []
 
 
 def test_review_inspection_is_not_approval_and_approval_requires_eligible_coverage(
@@ -638,6 +671,83 @@ def test_rebuild_generates_corrected_occupancy_without_detection(
         .splitlines()
     ]
     assert any(row["source"] == "corrected" for row in second_corrected)
+
+
+def test_corrected_playback_captions_use_derived_coverage_and_warnings(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import valoscribe.tactical.corrections as corrections
+
+    config, _ = load_config(ROOT / "configs/examples/ascent-team-movement.example.yaml")
+    captured: list[str] = []
+
+    class Capture:
+        def isOpened(self):  # noqa: N802
+            return True
+
+        def set(self, *_args):
+            return True
+
+        def read(self):
+            return True, np.zeros((1080, 1920, 3), dtype=np.uint8)
+
+        def release(self):
+            pass
+
+    class Writer:
+        def isOpened(self):  # noqa: N802
+            return True
+
+        def write(self, _frame):
+            pass
+
+        def release(self):
+            pass
+
+    class WriterFactory:
+        fourcc = staticmethod(cv2.VideoWriter.fourcc)
+
+        def __new__(cls, *_args):
+            return Writer()
+
+    monkeypatch.setattr(cv2, "VideoCapture", lambda _source: Capture())
+    monkeypatch.setattr(cv2, "VideoWriter", WriterFactory)
+    monkeypatch.setattr(cv2, "putText", lambda _image, text, *_args: captured.append(text))
+    monkeypatch.setattr(cv2, "circle", lambda *_args: None)
+    monkeypatch.setattr(cv2, "polylines", lambda *_args: None)
+    monkeypatch.setattr(cv2, "solve", lambda *_args: np.eye(2))
+
+    frames = [
+        {
+            "sample_index": 0,
+            "source_timestamp_seconds": 1.0,
+            "coverage_status": "partial",
+            "warning": "detector warning",
+        },
+        {"sample_index": 1, "source_timestamp_seconds": 2.0, "coverage_status": "partial"},
+    ]
+    corrections._write_playbacks(
+        tmp_path,
+        "round",
+        tmp_path,
+        config,
+        np.zeros((64, 64, 3), dtype=np.uint8),
+        {"zones": []},
+        {
+            0: [
+                {"canonical_x": 100.0, "canonical_y": 100.0},
+                {"canonical_x": None, "canonical_y": None},
+            ],
+            1: [{"canonical_x": None, "canonical_y": None}],
+        },
+        frames,
+        set(),
+    )
+
+    assert sum("coverage=partial" in text for text in captured) == 2
+    assert sum("coverage=unknown" in text for text in captured) == 2
+    assert sum("1 observation(s) lack canonical coordinates" in text for text in captured) == 4
+    assert sum("detector warning" in text for text in captured) == 2
 
 
 def load_config_data(payload: dict) -> None:

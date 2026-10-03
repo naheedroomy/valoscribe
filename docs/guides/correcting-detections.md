@@ -16,10 +16,11 @@ The OpenCV reviewer shows the source minimap crop, sampled timestamp, round, cur
 - Left/Right arrows or A/D: previous/next sampled frame.
 - Left click an existing marker: select it; click an empty map location: add a marker.
 - Delete, Backspace, or `.`: remove the selected raw marker. Moving is performed as remove then add.
-- `S`: append staged deltas and an explicit frame-review record, even if no changes were staged.
+- `S`: append staged deltas and an explicit frame-review record, even if no changes were staged. `V` must be pressed to approve the currently displayed frame; inspecting it alone does not approve it.
+- `X`: discard staged changes and restore the current frame to its last committed raw-plus-corrections state. Navigation remains locked while changes are unsaved.
 - `Q` or Esc: quit without saving staged changes.
 
-The `* UNSAVED` indicator is shown while deltas are staged. Raw observations are never edited. Deltas include run/round/sample, operation, stable target observation ID and original position when applicable, corrected position, reviewer, note, and timestamp. Invalid target IDs, mismatched original positions, invalid round IDs, and out-of-map corrected coordinates are rejected.
+The `* UNSAVED` indicator is shown while deltas are staged. Raw observations are never edited. Deltas include run/round/sample, operation, stable target observation ID and original position when applicable, corrected position, reviewer, note, and timestamp. Invalid target IDs, mismatched original positions, invalid round IDs, and out-of-map corrected coordinates are rejected. `V` approves only the latest record for that sample; a later inspection record with `approved: false` revokes approval. Approval is rejected for excluded/unknown coverage or observations with missing canonical coordinates. A frame with zero approved markers is not proof that no team members were present.
 
 ## Rebuild
 

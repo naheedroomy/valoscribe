@@ -232,6 +232,37 @@ def corrected_rows(
     return rows, approved_samples
 
 
+def _effective_coverage(
+    frame: dict[str, Any],
+    observations: list[dict[str, Any]],
+    approved_samples: set[int],
+) -> tuple[str, list[str]]:
+    points = [
+        obs
+        for obs in observations
+        if obs.get("canonical_x") is not None and obs.get("canonical_y") is not None
+    ]
+    unavailable = len(observations) - len(points)
+    sample = int(frame["sample_index"])
+    status = (
+        "excluded"
+        if frame["coverage_status"] == "excluded"
+        else "good"
+        if sample in approved_samples
+        else "unknown"
+        if unavailable and not points
+        else "partial"
+        if unavailable
+        else frame["coverage_status"]
+    )
+    warnings = [frame["warning"]] if frame.get("warning") else []
+    if unavailable:
+        warnings.append(f"{unavailable} observation(s) lack canonical coordinates")
+    if sample not in approved_samples and frame["coverage_status"] != "excluded" and not warnings:
+        warnings.append("frame not explicitly approved")
+    return status, warnings
+
+
 def _write_playbacks(
     run_dir: Path,
     round_id: str,
@@ -279,13 +310,12 @@ def _write_playbacks(
                 raise ValueError(f"source frame unavailable at {timestamp:.3f}s")
             minimap = image[crop.y : crop.y + crop.height, crop.x : crop.x + crop.width].copy()
             map_image = zone_frame.copy()
-            status = (
-                "excluded"
-                if frame["coverage_status"] == "excluded"
-                else "good"
-                if frame["sample_index"] in approved_samples
-                else frame["coverage_status"]
+            status, warnings = _effective_coverage(
+                frame,
+                canonical_by_sample.get(int(frame["sample_index"]), []),
+                approved_samples,
             )
+            warning_text = f" warnings={'; '.join(warnings)}" if warnings else ""
             for obs in canonical_by_sample.get(frame["sample_index"], []):
                 if obs.get("canonical_x") is None or obs.get("canonical_y") is None:
                     continue
@@ -307,7 +337,7 @@ def _write_playbacks(
                 )
             cv2.putText(
                 minimap,
-                f"{round_id} {timestamp:.2f}s CORRECTED coverage={status}",
+                f"{round_id} {timestamp:.2f}s CORRECTED coverage={status}{warning_text}",
                 (4, 14),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.4,
@@ -316,7 +346,7 @@ def _write_playbacks(
             )
             cv2.putText(
                 map_image,
-                f"{round_id} {timestamp:.2f}s coverage={status}",
+                f"{round_id} {timestamp:.2f}s coverage={status}{warning_text}",
                 (20, 30),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.6,
@@ -371,11 +401,9 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
         zone_counts: Counter[str] = Counter()
         macro_counts: Counter[str] = Counter()
         points: list[tuple[float, float]] = []
-        unavailable_coordinates = 0
         for obs in observations:
             x, y = obs.get("canonical_x"), obs.get("canonical_y")
             if x is None or y is None:
-                unavailable_coordinates += 1
                 continue
             zone, macro = assign_zone(float(x), float(y), map_data)
             zone_counts[zone] += 1
@@ -391,28 +419,9 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
             if points
             else None
         )
-        status = (
-            "excluded"
-            if frame["coverage_status"] == "excluded"
-            else "good"
-            if sample in approved_samples
-            else "unknown"
-            if unavailable_coordinates and not points
-            else "partial"
-            if unavailable_coordinates
-            else frame["coverage_status"]
+        status, warnings = _effective_coverage(
+            frame, observations, approved_samples
         )
-        warnings = [frame["warning"]] if frame.get("warning") else []
-        if unavailable_coordinates:
-            warnings.append(
-                f"{unavailable_coordinates} observation(s) lack canonical coordinates"
-            )
-        if (
-            sample not in approved_samples
-            and frame["coverage_status"] != "excluded"
-            and not warnings
-        ):
-            warnings.append("frame not explicitly approved")
         occupancy.append(
             {
                 "run_id": config.run.run_id,

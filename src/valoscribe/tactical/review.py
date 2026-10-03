@@ -99,6 +99,9 @@ def review_round(
                     },
                 )
             )
+    baseline_by_sample = {
+        sample: list(entries) for sample, entries in by_sample.items()
+    }
     indices = sorted(frames)
     if not indices:
         raise ValueError(f"no sample frames available for {round_id}")
@@ -143,6 +146,9 @@ def review_round(
                     note="Frame reviewed in local reviewer",
                 )
             ],
+        )
+        baseline_by_sample[controller.sample_index] = list(
+            by_sample.get(controller.sample_index, [])
         )
         controller.saved()
 
@@ -261,6 +267,7 @@ def review_round(
                 save()
             elif keypress == ord("x"):
                 controller.discard()
+                by_sample[sample] = list(baseline_by_sample.get(sample, []))
                 approved = False
                 selected = None
             elif keypress == ord("v"):
