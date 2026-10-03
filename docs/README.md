@@ -22,6 +22,7 @@ These documents describe existing or historical capabilities and do not certify 
 
 - [Running the team-shape MVP](guides/running-team-shape-mvp.md) — inspect/analyze commands and evidence limitations.
 - [Correcting detections](guides/correcting-detections.md) — local reviewer controls, append-only deltas, and derived rebuilds (MVP-003).
+- [Interpreting movement reports](guides/interpreting-movement-reports.md) — rule thresholds, evidence links, coverage denominators, and limits (MVP-004).
 - [MVP-001 calibration candidate](status/mvp001-calibration-candidate.md) — source-backed intervals and manually reviewed agent candidate geometry; user review remains pending.
 - [MVP-003 corrections and occupancy validation](status/mvp003-corrections-occupancy-validation.md) — local correction/rebuild proof with explicit agent-review limitations.
 - [Archived synthetic VTA-704 example](../examples/tactical_mvp/vta704/) is a legacy report example, not real tactical evidence.

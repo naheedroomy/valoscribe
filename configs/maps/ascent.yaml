@@ -379,6 +379,10 @@
       ]
     }
   ],
+  "commitment_zones": {
+    "A": ["a_main", "a_site"],
+    "B": ["b_main", "b_site"]
+  },
   "unknown_zone": {
     "zone_id": "unknown",
     "name": "Unknown / outside configured polygons",

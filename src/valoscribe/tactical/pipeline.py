@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
+import os
 import resource
 import subprocess
 import sys
@@ -20,6 +22,7 @@ from valoscribe.tactical import __version__
 from valoscribe.tactical.config import RoundConfig, TacticalConfig, load_map_config
 from valoscribe.tactical.contracts import RawMarkerObservation, RunManifest, TeamFrameState
 from valoscribe.tactical.detection import crop_map_mask, detect_markers
+from valoscribe.tactical.reporting import write_aggregate_report, write_round_report
 
 
 def peak_rss_bytes() -> int:
@@ -299,6 +302,52 @@ def create_run_directory(output_root: Path, run_id: str) -> Path:
     run_dir = output_root / run_id
     run_dir.mkdir(parents=False, exist_ok=False)
     return run_dir
+
+
+def _annotate_phase_playback(path: Path, round_id: str, sample_fps: float, summary) -> None:
+    annotations: dict[int, list[str]] = {}
+    if summary.first_major_shift_evidence:
+        index = int(summary.first_major_shift_evidence["after"]["sample_index"])
+        annotations.setdefault(index, []).append(
+            f"Observed shift toward {summary.first_major_shift_direction}"
+        )
+    if summary.commitment_evidence:
+        index = int(summary.commitment_evidence["sample"]["sample_index"])
+        annotations.setdefault(index, []).append(
+            f"Apparent {summary.apparent_commitment_site} commitment"
+        )
+    if not annotations:
+        return
+    capture = cv2.VideoCapture(str(path))
+    if not capture.isOpened():
+        raise ValueError(f"cannot read canonical playback for phase annotation: {path}")
+    width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    temporary = path.with_name(f".{path.stem}.annotated.mp4")
+    writer = _open_writer(temporary, sample_fps, (width, height))
+    try:
+        sample_index = 0
+        while True:
+            ok, frame = capture.read()
+            if not ok or frame is None:
+                break
+            for line, text in enumerate(annotations.get(sample_index, [])):
+                cv2.putText(
+                    frame,
+                    text,
+                    (20, 190 + line * 28),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (0, 255, 255),
+                    2,
+                    cv2.LINE_AA,
+                )
+            writer.write(frame)
+            sample_index += 1
+    finally:
+        capture.release()
+        writer.release()
+    os.replace(temporary, path)
 
 
 def _open_writer(path: Path, fps: float, size: tuple[int, int]) -> cv2.VideoWriter:
@@ -644,6 +693,102 @@ def analyze_config(
                 "observed_span_seconds": [first, last],
             }
         )
+    round_summaries = []
+    for round_config in config.rounds:
+        round_dir = rounds_dir / round_config.round_id
+        raw_rows = [
+            json.loads(line)
+            for line in (round_dir / "raw_observations.jsonl").read_text().splitlines()
+        ]
+        coverage_rows = [
+            json.loads(line)
+            for line in (round_dir / "sample_coverage.jsonl").read_text().splitlines()
+        ]
+        raw_by_sample: dict[int, list[dict]] = {}
+        for row in raw_rows:
+            raw_by_sample.setdefault(int(row["sample_index"]), []).append(row)
+        occupancy = []
+        for frame in coverage_rows:
+            macro_counts: Counter[str] = Counter()
+            zone_counts: Counter[str] = Counter()
+            for observation in raw_by_sample.get(int(frame["sample_index"]), []):
+                x, y = observation.get("canonical_x"), observation.get("canonical_y")
+                if x is not None and y is not None:
+                    zone, macro = assign_zone(float(x), float(y), map_data)
+                    zone_counts[zone] += 1
+                    macro_counts[macro] += 1
+            status = frame["coverage_status"]
+            if (
+                any(
+                    row.get("canonical_x") is None or row.get("canonical_y") is None
+                    for row in raw_by_sample.get(int(frame["sample_index"]), [])
+                )
+                and status != "excluded"
+            ):
+                status = "unknown"
+            occupancy.append(
+                {
+                    **frame,
+                    "coverage_status": status,
+                    "zone_counts": {
+                        zone_id: zone_counts[zone_id]
+                        for zone_id in [zone["zone_id"] for zone in map_data["zones"]] + ["unknown"]
+                    },
+                    "macro_counts": {
+                        key: macro_counts[key] for key in ("A", "MID", "B", "SPAWN", "OTHER")
+                    },
+                    "corrected": False,
+                }
+            )
+        occupancy_path = round_dir / "occupancy.csv"
+        with occupancy_path.open("w", newline="", encoding="utf-8") as stream:
+            writer = csv.DictWriter(
+                stream,
+                fieldnames=list(occupancy[0]) if occupancy else ["round_id"],
+            )
+            writer.writeheader()
+            for row in occupancy:
+                writer.writerow(
+                    {
+                        key: json.dumps(value, separators=(",", ":"))
+                        if isinstance(value, (dict, list))
+                        else value
+                        for key, value in row.items()
+                    }
+                )
+        try:
+            import pyarrow as pa  # type: ignore[import-untyped]
+            import pyarrow.parquet as pq  # type: ignore[import-untyped]
+        except ImportError as error:
+            raise ImportError(
+                "occupancy.parquet requires the project's parquet extra (uv sync --extra parquet)"
+            ) from error
+        pq.write_table(pa.Table.from_pylist(occupancy), round_dir / "occupancy.parquet")
+        processing_summary = json.loads((round_dir / "summary.json").read_text(encoding="utf-8"))
+        round_summary = write_round_report(
+            round_dir, round_config.round_id, round_config, config, occupancy, map_data
+        )
+        round_summaries.append(round_summary)
+        _annotate_phase_playback(
+            round_dir / "canonical_playback.mp4",
+            round_config.round_id,
+            config.run.sample_fps,
+            round_summary,
+        )
+        summary_path = round_dir / "summary.json"
+        saved_summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        saved_summary["artifacts"] = processing_summary.get("artifacts", {})
+        saved_summary["artifacts"].update(
+            {"occupancy_csv": "occupancy.csv", "occupancy_parquet": "occupancy.parquet"}
+        )
+        summary_path.write_text(json.dumps(saved_summary, indent=2) + "\n", encoding="utf-8")
+    write_aggregate_report(
+        run_dir / "aggregate",
+        config.run.run_id,
+        round_summaries,
+        [item.round_id for item in config.rounds],
+        [item["round_id"] for item in config.excluded_rounds],
+    )
     elapsed = time.monotonic() - started
     try:
         commit = subprocess.run(

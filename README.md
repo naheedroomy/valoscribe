@@ -4,7 +4,7 @@ Valoscribe is an offline VALORANT broadcast-video analyzer. The active milestone
 
 ## Current status
 
-RST-001/RST-002 are accepted. The Ascent crop and approximate zone geometry have parent-agent visual review for manual team-shape development only; this is not user approval, official geometry, or quantitative registration accuracy. MVP-002 now provides offline `tactical inspect` and `tactical analyze` commands and has produced local five-interval candidate playback. Color detections remain unreviewed partial observations; corrections, occupancy exports, deterministic summaries, and full MVP acceptance are not implemented. See the [active specification](specs/active/MVP_RESET_AND_REPOSITORY_CLEANUP_SPEC.md), [calibration evidence](docs/status/mvp001-calibration-candidate.md), and [documentation index](docs/README.md).
+RST-001/RST-002 are accepted. The Ascent crop and approximate zone geometry have parent-agent visual review for manual team-shape development only; this is not user approval, official geometry, or quantitative registration accuracy. MVP-004 adds deterministic per-round and aggregate candidate reports, occupancy exports, and report regeneration in immutable correction revisions. Source candidates remain partially observed and need human review/correction; real-round product acceptance is pending. See the [active specification](specs/active/MVP_RESET_AND_REPOSITORY_CLEANUP_SPEC.md), [calibration evidence](docs/status/mvp001-calibration-candidate.md), [movement-report interpretation](docs/guides/interpreting-movement-reports.md), and [documentation index](docs/README.md).
 
 ## Setup
 
@@ -23,9 +23,10 @@ Configure a local source path under `.local/configs/` and inspect before analysi
 ```bash
 uv run python -m valoscribe tactical inspect --config .local/configs/ascent-team-movement-mvp001.yaml
 uv run python -m valoscribe tactical analyze --config .local/configs/ascent-team-movement-mvp001.yaml
+uv run python -m valoscribe tactical rebuild --run-dir .local/runs/ascent-team-movement-mvp002-r3
 ```
 
-`inspect` writes local calibration artifacts; `analyze` refuses to overwrite an existing run and processes only configured intervals. Output is local under `.local/runs/<run_id>/`. Candidate color detections are not accepted ground truth, partial coverage is not absence evidence, and this command does not produce correction or tactical-summary outputs. See [run instructions](docs/guides/running-team-shape-mvp.md).
+`inspect` writes local calibration artifacts; `analyze` refuses to overwrite an existing run and processes only configured intervals. The `rebuild` example was run against the existing five-round local run: it generated a new immutable derived report revision without marker detection. Outputs remain under `.local/runs/<run_id>/`; each round includes occupancy CSV/Parquet and evidence-linked summary JSON/Markdown, and the run includes aggregate JSON/Markdown/CSV/representative-round outputs. Candidate color detections are not accepted ground truth, partial coverage is not absence evidence, and summaries do not establish complete-team presence or intent. See [run instructions](docs/guides/running-team-shape-mvp.md), [correction/rebuild instructions](docs/guides/correcting-detections.md), and [report interpretation](docs/guides/interpreting-movement-reports.md).
 
 ## Development checks
 

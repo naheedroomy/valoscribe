@@ -1,0 +1,13 @@
+# Interpret deterministic movement reports
+
+MVP-004 emits evidence-bounded candidate descriptions, not tactical truth. Round `summary.json` records each claimed opening/shift/commitment timestamp with `sample_index`, observed macro counts, coverage status, and raw/corrected source. `summary.md` gives a concise view. The aggregate `summary.json`, `summary.md`, `pattern_table.csv`, and `representative_rounds.json` use exact round IDs and denominators; unknown features are listed rather than silently dropped.
+
+The opening distribution is the modal observed A/MID/B occupancy in the first configured 6–10 usable seconds after live start. Its `opening_observed_samples` and `opening_sample_denominator` show coverage; `opening_completeness` remains `unknown` because these outputs do not establish the full team. `candidate_partial_coverage` means the observed markers are only candidate detections and does not assert all five players are represented.
+
+A major shift/regroup requires a macro count increase of at least the configured `major_shift_min_increase` over the stable prior window, sustained for `shift_persistence_seconds`. Unknown/excluded samples and timestamp gaps break persistence. An apparent commitment requires at least three observed markers and at least 60% in the map-configured A/B site-plus-approach zones for `commitment_persistence_seconds`; a reversal or coverage gap breaks the claim. These are deterministic rules, not strategy labels.
+
+Opposite-side `present` requires a positive observation in the opposite A/B group during commitment. `not_observed` is reserved for a continuously `good` window with at least the configured `strong_coverage_marker_count` (default five) per sample; a reviewer approval or four observed markers alone does not establish completeness. A one-second configured reversal guard must also pass for commitments. Other cases remain `unknown`.
+
+After corrections, each new `rounds/<round-id>/derived/revision-NNN/` contains that revision's summary and corrected playback. A rebuild also publishes a new immutable `aggregate/derived-revision-NNN/` snapshot. Older revisions and raw observations remain unchanged. Rebuild reads captured raw/coverage/correction/review inputs and does not invoke the detector. Initial analysis writes reports under each round and `aggregate/`.
+
+The source-specific broadcast transform, Ascent polygons, and automatic candidate detections remain pending final human review. Reports do not establish player identity, intent, map control, utility causality, or a recurring strategy. Run/rebuild commands are documented in [running the MVP](running-team-shape-mvp.md) and [correcting detections](correcting-detections.md).

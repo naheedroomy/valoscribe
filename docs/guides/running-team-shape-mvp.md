@@ -1,6 +1,6 @@
 # Run the offline team-shape MVP
 
-This workflow samples only the manually configured source intervals. It does not discover rounds, identify players, infer missing detections, or make tactical summaries. Generated media and run data stay under ignored `.local/`.
+This workflow samples only manually configured source intervals. It does not discover rounds, identify players, or infer missing detections. Deterministic movement summaries describe observed candidates only. Generated media and run data stay under ignored `.local/`.
 
 ## Configuration
 
@@ -17,7 +17,7 @@ uv run python -m valoscribe tactical analyze \
   --config .local/configs/ascent-team-movement-mvp001.yaml
 ```
 
-`inspect` verifies dimensions and hashes, then produces crop, transform, and zone artifacts without marker/tactical claims. `analyze` refuses to overwrite `.local/runs/<run_id>/`, processes only the configured intervals at the configured low rate, and writes compact raw observations, one coverage row per sample (including zero-candidate frames and exclusions), per-round preview videos, and a manifest. Choose a new run ID to rerun after review; do not remove prior evidence to reuse a name.
+`inspect` verifies dimensions and hashes, then produces crop, transform, and zone artifacts without marker/tactical claims. `analyze` refuses to overwrite `.local/runs/<run_id>/`, processes only configured intervals at the configured low rate, and writes raw observations, coverage rows, occupancy CSV/Parquet, per-round preview and summary JSON/Markdown, and a manifest. Aggregate JSON/Markdown, pattern CSV, and representative-round JSON are written under `aggregate/`. Choose a new run ID to rerun after review; do not remove prior evidence to reuse a name.
 
 ## Interpret output cautiously
 

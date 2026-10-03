@@ -74,6 +74,57 @@ class ReviewedFrame(Contract):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
+class RoundMovementSummary(Contract):
+    run_id: str
+    round_id: str
+    selected_team: str
+    side: str
+    source_interval_seconds: tuple[float, float]
+    live_start_seconds: float
+    usable_time_seconds: float = Field(ge=0)
+    opening_distribution: dict[str, int] | None
+    opening_observed_samples: int = Field(ge=0)
+    opening_sample_denominator: int = Field(ge=0)
+    opening_confidence: str
+    opening_completeness: Literal["unknown", "affirmed"]
+    opening_evidence: dict = Field(default_factory=dict)
+    first_major_shift_time: float | None = None
+    first_major_shift_direction: str | None = None
+    first_major_shift_evidence: dict | None = None
+    regroup_direction: str | None = None
+    regroup_evidence: dict | None = None
+    apparent_commitment_site: str | None = None
+    apparent_commitment_time: float | None = None
+    commitment_evidence: dict | None = None
+    opposite_side_presence: Literal["present", "not_observed", "unknown"]
+    opposite_side_evidence: list[dict] = Field(default_factory=list)
+    representative_timestamps: list[dict] = Field(default_factory=list)
+    unknown_intervals: list[dict] = Field(default_factory=list)
+    coverage_numerator: int = Field(ge=0)
+    coverage_denominator: int = Field(ge=0)
+    warnings: list[str] = Field(default_factory=list)
+    rule_configuration: dict = Field(default_factory=dict)
+    evidence_paths: dict[str, str] = Field(default_factory=dict)
+
+
+class AggregateMovementSummary(Contract):
+    run_id: str
+    included_rounds: list[str]
+    excluded_rounds: list[str]
+    opening_pattern_counts: dict[str, int]
+    apparent_commitment_counts: dict[str, int]
+    regroup_direction_counts: dict[str, int]
+    opposite_side_presence_counts: dict[str, int]
+    approximate_commitment_time_distribution: dict[str, int]
+    recurring_patterns: list[dict]
+    representative_rounds: list[dict]
+    feature_unknown_round_ids: list[str]
+    feature_unknown_by_feature: dict[str, list[str]]
+    correction_counts_by_round: dict[str, int]
+    pattern_denominators: dict[str, int]
+    limitations: list[str]
+
+
 class RunManifest(Contract):
     schema_version: Literal[1] = 1
     run_id: str

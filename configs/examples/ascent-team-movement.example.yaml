@@ -7,7 +7,13 @@
     "output_root": ".local/runs",
     "debug_level": "summary",
     "opening_window_seconds": 8.0,
-    "opening_window_definition": "First 8 usable seconds after live_start_offset_seconds; excluded/replay samples are gaps and do not count toward usable opening coverage."
+    "opening_window_definition": "First 8 usable seconds after live_start_offset_seconds; excluded/replay samples are gaps and do not count toward usable opening coverage.",
+    "stable_prior_window_seconds": 2.0,
+    "shift_persistence_seconds": 2.0,
+    "major_shift_min_increase": 2,
+    "commitment_persistence_seconds": 2.0,
+    "commitment_reversal_guard_seconds": 1.0,
+    "strong_coverage_marker_count": 5
   },
   "source": {
     "video_path": "../VOD/YTDown.com_YouTube_Media_4LEGEQ8KBS0_100T-vs-LOUD-VCT-Americas-Stage-2-Playoffs-Grand-Final-Map-3-Ascent_001_1080p.mp4",

@@ -156,6 +156,12 @@ class RunConfig(StrictModel):
     debug_level: str
     opening_window_seconds: float = Field(ge=6, le=10)
     opening_window_definition: str
+    stable_prior_window_seconds: float = Field(default=2.0, gt=0)
+    shift_persistence_seconds: float = Field(default=2.0, gt=0)
+    major_shift_min_increase: int = Field(default=2, ge=1)
+    commitment_persistence_seconds: float = Field(default=2.0, gt=0)
+    commitment_reversal_guard_seconds: float = Field(default=1.0, ge=0)
+    strong_coverage_marker_count: int = Field(default=5, ge=1)
 
 
 class TacticalConfig(StrictModel):
@@ -200,6 +206,13 @@ def load_map_config(path: Path) -> dict[str, Any]:
     data = json.loads(path.read_text(encoding="utf-8"))
     if data.get("map_id") != "ascent" or not isinstance(data.get("zones"), list):
         raise ValueError("map config must define Ascent zones")
+    commitment_zones = data.get("commitment_zones", {})
+    zone_ids = {zone.get("zone_id") for zone in data["zones"]}
+    for macro, zone_list in commitment_zones.items():
+        if macro not in {"A", "B"} or not isinstance(zone_list, list):
+            raise ValueError("commitment_zones must map A/B to zone ID lists")
+        if any(zone_id not in zone_ids for zone_id in zone_list):
+            raise ValueError(f"commitment_zones.{macro} references an unknown zone")
     for zone in data["zones"]:
         if not zone.get("zone_id") or len(zone.get("vertices_px", [])) < 3:
             raise ValueError("each zone needs an id and at least three vertices")

@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from valoscribe.tactical.config import TacticalConfig
 from valoscribe.tactical.contracts import CorrectionDelta, ReviewedFrame
 from valoscribe.tactical.pipeline import assign_zone, load_assets, resolve_path
+from valoscribe.tactical.reporting import write_round_report
 
 
 def observation_id(round_id: str, sample_index: int, ordinal: int) -> str:
@@ -273,6 +274,7 @@ def _write_playbacks(
     canonical_by_sample: dict[int, list[dict]],
     coverage: list[dict],
     approved_samples: set[int],
+    summary=None,
 ) -> None:
     source = resolve_path(config.source.video_path)
     crop = config.broadcast.minimap_crop
@@ -316,12 +318,15 @@ def _write_playbacks(
                 approved_samples,
             )
             warning_text = f" warnings={'; '.join(warnings)}" if warnings else ""
+            macro_counts: Counter[str] = Counter()
             for obs in canonical_by_sample.get(frame["sample_index"], []):
                 if obs.get("canonical_x") is None or obs.get("canonical_y") is None:
                     continue
                 x, y = float(obs["canonical_x"]), float(obs["canonical_y"])
                 p = (round(x), round(y))
                 confidence = float(obs.get("confidence", 1.0))
+                _zone_id, macro = assign_zone(x, y, map_data)
+                macro_counts[macro] += 1
                 cv2.circle(map_image, p, 8, (0, 255, 255), 2)
                 source_point = np.linalg.solve(matrix[:, :2], np.array([x, y]) - matrix[:, 2])
                 minimap_point = (round(float(source_point[0])), round(float(source_point[1])))
@@ -335,24 +340,69 @@ def _write_playbacks(
                     (255, 255, 255),
                     1,
                 )
+            sample_observations = canonical_by_sample.get(int(frame["sample_index"]), [])
+            source_state = (
+                "CORRECTED"
+                if any(item.get("source") == "corrected" for item in sample_observations)
+                else "REVIEWED"
+                if int(frame["sample_index"]) in approved_samples
+                else "RAW"
+            )
+            minimap_caption = (
+                f"{config.team.short_name} {config.team.side} {round_id} "
+                f"{timestamp:.2f}s {source_state} coverage={status}{warning_text}"
+            )
             cv2.putText(
                 minimap,
-                f"{round_id} {timestamp:.2f}s CORRECTED coverage={status}{warning_text}",
+                minimap_caption,
                 (4, 14),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.4,
                 (255, 255, 255),
                 1,
             )
+            phase_annotations = []
+            if (
+                summary
+                and summary.first_major_shift_evidence
+                and summary.first_major_shift_evidence["after"]["sample_index"]
+                == frame["sample_index"]
+            ):
+                phase_annotations.append(
+                    f"observed shift toward {summary.first_major_shift_direction}"
+                )
+            if (
+                summary
+                and summary.commitment_evidence
+                and summary.commitment_evidence["sample"]["sample_index"] == frame["sample_index"]
+            ):
+                phase_annotations.append(f"apparent {summary.apparent_commitment_site} commitment")
+            macro_text = "A={} MID={} B={}".format(
+                macro_counts["A"], macro_counts["MID"], macro_counts["B"]
+            )
+            canonical_caption = (
+                f"{config.team.short_name} {config.team.side} | {timestamp:.2f}s | "
+                f"{macro_text} | {source_state} coverage={status}{warning_text}"
+            )
             cv2.putText(
                 map_image,
-                f"{round_id} {timestamp:.2f}s coverage={status}{warning_text}",
+                canonical_caption,
                 (20, 30),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.6,
                 (255, 255, 255),
                 2,
             )
+            for index, annotation in enumerate(phase_annotations):
+                cv2.putText(
+                    map_image,
+                    annotation,
+                    (20, 60 + index * 25),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.6,
+                    (0, 255, 255),
+                    2,
+                )
             mini_writer.write(minimap)
             map_writer.write(map_image)
     finally:
@@ -419,9 +469,7 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
             if points
             else None
         )
-        status, warnings = _effective_coverage(
-            frame, observations, approved_samples
-        )
+        status, warnings = _effective_coverage(frame, observations, approved_samples)
         occupancy.append(
             {
                 "run_id": config.run.run_id,
@@ -429,7 +477,10 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
                 "sample_index": sample,
                 "source_timestamp_seconds": frame["source_timestamp_seconds"],
                 "observed_marker_count": len(observations),
-                "zone_counts": dict(zone_counts),
+                "zone_counts": {
+                    zone_id: zone_counts[zone_id]
+                    for zone_id in [zone["zone_id"] for zone in map_data["zones"]] + ["unknown"]
+                },
                 "macro_counts": {
                     key: macro_counts[key] for key in ("A", "MID", "B", "SPAWN", "OTHER")
                 },
@@ -438,6 +489,7 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
                 "spread": spread,
                 "coverage_status": status,
                 "warnings": warnings,
+                "corrected": any(obs.get("source") == "corrected" for obs in observations),
             }
         )
     corrected_path = output / "corrected_observations.jsonl"
@@ -465,17 +517,48 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
             "occupancy.parquet requires the project's parquet extra (uv sync --extra parquet)"
         ) from error
     pq.write_table(pa.Table.from_pylist(occupancy), output / "occupancy.parquet")
+    round_config = next(item for item in config.rounds if item.round_id == round_id)
+    summary = write_round_report(
+        round_dir,
+        round_id,
+        round_config,
+        config,
+        occupancy,
+        map_data,
+        report_root=output,
+        evidence_paths={
+            "minimap_playback": "corrected_minimap.mp4",
+            "canonical_playback": "corrected_canonical.mp4",
+        },
+    )
     _write_playbacks(
-        run_dir, round_id, output, config, asset, map_data, by_sample, coverage, approved_samples
+        run_dir,
+        round_id,
+        output,
+        config,
+        asset,
+        map_data,
+        by_sample,
+        coverage,
+        approved_samples,
+        summary,
     )
     manifest = {
         "revision": revision,
         "round_id": round_id,
         "raw_observations_sha256": hashlib.sha256(raw_path.read_bytes()).hexdigest(),
+        "corrections_sha256": hashlib.sha256(
+            (round_dir / "corrections.jsonl").read_bytes()
+        ).hexdigest()
+        if (round_dir / "corrections.jsonl").exists()
+        else hashlib.sha256(b"").hexdigest(),
+        "reviewed_frames_sha256": hashlib.sha256(
+            (round_dir / "reviewed_frames.jsonl").read_bytes()
+        ).hexdigest()
+        if (round_dir / "reviewed_frames.jsonl").exists()
+        else hashlib.sha256(b"").hexdigest(),
         "correction_count": len(correction_history),
-        "reviewed_frame_count": len(
-            {int(row["sample_index"]) for row in review_history}
-        ),
+        "reviewed_frame_count": len({int(row["sample_index"]) for row in review_history}),
         "frame_count": len(occupancy),
         "detector_invoked": False,
         "artifacts": [
@@ -484,6 +567,8 @@ def rebuild_round(run_dir: Path, round_id: str, config: TacticalConfig) -> dict[
             "occupancy.parquet",
             "corrected_minimap.mp4",
             "corrected_canonical.mp4",
+            "summary.json",
+            "summary.md",
         ],
     }
     (output / "revision.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
