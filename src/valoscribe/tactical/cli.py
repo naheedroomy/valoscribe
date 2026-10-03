@@ -12,7 +12,14 @@ import typer
 from valoscribe.tactical.config import load_config
 from valoscribe.tactical.contracts import MarkerAdjudication, RoundMovementSummary
 from valoscribe.tactical.corrections import append_adjudications, rebuild_round
+from valoscribe.tactical.manifest import load_manifest, load_profile
 from valoscribe.tactical.pipeline import analyze_config, inspect_config
+from valoscribe.tactical.preflight import (
+    PreflightValidationError,
+    RoundRangeResolutionError,
+    VODExecutionPlan,
+    validate_vod_preflight,
+)
 from valoscribe.tactical.reporting import write_aggregate_report
 from valoscribe.tactical.review import review_round
 
@@ -174,3 +181,127 @@ def analyze_command(
         raise typer.BadParameter(str(error)) from error
     typer.echo(f"Run artifacts: {run_dir}")
     typer.echo(json.dumps(result, indent=2))
+
+
+def _format_round_summary_table(plan: VODExecutionPlan) -> str:
+    headers = [
+        "Round",
+        "Map Round",
+        "Start (s)",
+        "End (s)",
+        "Live Start (s)",
+        "Selected Side",
+        "Opponent Side",
+        "Exclusions",
+    ]
+    rows: list[list[str]] = []
+    for r in plan.selected_rounds:
+        rows.append([
+            r.round_id,
+            str(r.map_round),
+            f"{r.source_interval_seconds[0]:.1f}",
+            f"{r.source_interval_seconds[1]:.1f}",
+            f"{r.source_interval_seconds[0] + r.live_start_offset_seconds:.1f}",
+            r.selected_team_side,
+            r.opponent_team_side,
+            str(len(r.excluded_intervals)),
+        ])
+
+    col_widths = [len(h) for h in headers]
+    for row in rows:
+        for i, cell in enumerate(row):
+            col_widths[i] = max(col_widths[i], len(cell))
+
+    header_line = " | ".join(h.ljust(col_widths[i]) for i, h in enumerate(headers))
+    separator_line = "-+-".join("-" * col_widths[i] for i in range(len(headers)))
+    row_lines = [
+        " | ".join(cell.ljust(col_widths[i]) for i, cell in enumerate(row))
+        for row in rows
+    ]
+    return "\n".join([header_line, separator_line] + row_lines)
+
+
+@app.command("analyze-vod")
+def analyze_vod_command(
+    vod: Path = typer.Option(
+        ..., "--vod", exists=True, dir_okay=False, help="Path to local VOD video file"
+    ),
+    map_name: str = typer.Option(..., "--map", help="Map name (currently 'ascent')"),
+    match_id: str = typer.Option(..., "--match", help="Match identifier"),
+    map_id: str = typer.Option(..., "--map-id", help="Map instance identifier"),
+    from_round: int = typer.Option(
+        ..., "--from-round", min=1, help="First round to analyze (inclusive)"
+    ),
+    to_round: int = typer.Option(
+        ..., "--to-round", min=1, help="Last round to analyze (inclusive)"
+    ),
+    team: str = typer.Option(..., "--team", help="Selected team identifier"),
+    profile_path: Path = typer.Option(
+        ..., "--profile", exists=True, dir_okay=False, help="Broadcast profile JSON path"
+    ),
+    round_manifest_path: Path = typer.Option(
+        ...,
+        "--round-manifest",
+        exists=True,
+        dir_okay=False,
+        help="Round manifest JSON path",
+    ),
+    output: Path = typer.Option(..., "--output", file_okay=False, help="Output directory path"),
+    preflight: bool = typer.Option(
+        True,
+        "--preflight/--no-preflight",
+        help="Preview execution plan and summary without running analysis",
+    ),
+    verify_sha: bool = typer.Option(
+        True,
+        "--verify-sha/--no-verify-sha",
+        help="Verify source video SHA-256 against manifest",
+    ),
+) -> None:
+    """Validate and execute VOD round-range tactical analysis."""
+    try:
+        manifest = load_manifest(round_manifest_path)
+        profile = load_profile(profile_path)
+        plan = validate_vod_preflight(
+            vod_path=vod,
+            map_name=map_name,
+            match_id=match_id,
+            map_id=map_id,
+            from_round=from_round,
+            to_round=to_round,
+            selected_team_id=team,
+            manifest=manifest,
+            profile=profile,
+            output_dir=output,
+            verify_sha256=verify_sha,
+        )
+    except (
+        PreflightValidationError,
+        RoundRangeResolutionError,
+        FileExistsError,
+        ValueError,
+    ) as error:
+        typer.echo(f"Error: {error}")
+        raise typer.Exit(1)
+
+    typer.echo("Preflight validation PASSED")
+    typer.echo(f"Selected Team: {plan.selected_team_id}")
+    typer.echo(f"Opponent: {plan.opponent_team_id}")
+
+    if preflight:
+        typer.echo("\nExecution Plan:")
+        typer.echo(plan.model_dump_json(indent=2))
+        typer.echo("\nRound Summary Table:")
+        typer.echo(_format_round_summary_table(plan))
+        return
+
+    output.mkdir(parents=True, exist_ok=True)
+    plan_path = output / "execution-plan.json"
+    plan_path.write_text(plan.model_dump_json(indent=2), encoding="utf-8")
+    typer.echo("\nRound Summary Table:")
+    typer.echo(_format_round_summary_table(plan))
+    typer.echo(
+        f"\nStage 1 foundation complete. Execution plan written to {plan_path}."
+        "\nOutputs are ready for Stage 2 baseline extraction."
+    )
+
