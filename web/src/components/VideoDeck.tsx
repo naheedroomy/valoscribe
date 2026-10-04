@@ -1,0 +1,7 @@
+import { useEffect, useRef } from "react";
+export function VideoDeck({src,time,start,end,playing,rate,onTime,onPlaying,onError}:{src:string;time:number;start:number;end:number;playing:boolean;rate:number;onTime:(time:number)=>void;onPlaying:(playing:boolean)=>void;onError:()=>void}) {
+ const ref=useRef<HTMLVideoElement>(null);
+ useEffect(()=>{const video=ref.current;if(!video)return; if(Math.abs(video.currentTime-time)>.18)video.currentTime=time;},[time]);
+ useEffect(()=>{const video=ref.current;if(!video)return;video.playbackRate=rate;if(playing)void video.play().catch(()=>onPlaying(false));else video.pause();},[playing,rate,onPlaying]);
+ return <div className="video-deck"><div className="video-frame"><video ref={ref} src={src} controls preload="metadata" playsInline aria-describedby="video-caption-note" onTimeUpdate={(event)=>{const video=event.currentTarget;if(video.currentTime<start){video.currentTime=start;onTime(start)}else if(video.currentTime>end){video.currentTime=end;video.pause();onPlaying(false);onTime(end)}else onTime(video.currentTime)}} onPlay={()=>onPlaying(true)} onPause={()=>onPlaying(false)} onError={onError} aria-label="Local VOD playback synchronized to selected round"/><div className="video-overlay-label">SOURCE VOD <i/> LOOPBACK MEDIA</div></div><p id="video-caption-note" className="video-caption-note">Caption track is not available in this local source.</p></div>;
+}

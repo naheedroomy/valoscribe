@@ -1,0 +1,9 @@
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+!/src/lib/
+!/src/lib/**
+!/src/app/api/runs/
+!/src/app/api/runs/**
